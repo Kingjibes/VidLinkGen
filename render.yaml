@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: web-app
+    env: node
+    plan: free
+    region: ohio  # or your preferred region
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    envVars:
+      - key: PORT
+        value: 3000
+      - key: NODE_ENV
+        value: production
+    healthCheckPath: /
+    healthCheckTimeout: 120
+    autoDeploy: true
+    properties:
+      build:
+        nodeVersion: 18
