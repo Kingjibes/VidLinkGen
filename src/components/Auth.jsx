@@ -1,0 +1,131 @@
+
+import React, { useState } from 'react';
+import { motion } from 'framer-motion';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { supabase } from '@/lib/supabase';
+import { useToast } from "@/components/ui/use-toast";
+
+const Auth = ({ setUser, setCurrentView, onSuccessfulRegister }) => {
+  const [authData, setAuthData] = useState({ email: '', password: '', name: '' });
+  const [loading, setLoading] = useState(false);
+  const { toast } = useToast();
+
+  const handleLogin = async () => {
+    if (!authData.email || !authData.password) {
+      toast({ title: "Login Failed", description: "Please enter both email and password.", variant: "destructive" });
+      return;
+    }
+    setLoading(true);
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: authData.email,
+      password: authData.password,
+    });
+
+    if (error) {
+      toast({ title: "Login Failed", description: error.message, variant: "destructive" });
+    } else if (data.user) {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', data.user.id)
+        .single();
+      setUser({ ...data.user, ...profile });
+      setAuthData({ email: '', password: '', name: '' });
+      setCurrentView('dashboard');
+      toast({ title: "Login Successful!", description: `Welcome back, ${profile?.name || 'User'}!`, variant: "default" });
+    }
+    setLoading(false);
+  };
+
+  const handleRegister = async () => {
+    if (!authData.name || !authData.email || !authData.password) {
+        toast({ title: "Registration Failed", description: "Please fill in all fields.", variant: "destructive" });
+        return;
+    }
+    setLoading(true);
+    const { data, error } = await supabase.auth.signUp({
+      email: authData.email,
+      password: authData.password,
+      options: {
+        data: {
+          name: authData.name,
+        }
+      }
+    });
+
+    if (error) {
+      toast({ title: "Registration Failed", description: error.message, variant: "destructive" });
+    } else if (data.user) {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', data.user.id)
+        .single();
+      setAuthData({ email: '', password: '', name: '' });
+      toast({ title: "Registration Successful!", description: "Please check your email to verify your account.", variant: "default" });
+      onSuccessfulRegister({ ...data.user, ...profile }); 
+    }
+    setLoading(false);
+  };
+
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-space-pattern pt-24 pb-12">
+      <motion.div
+        initial={{ opacity: 0, y: 30 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="w-full max-w-md px-4"
+      >
+        <Card className="glass-effect border-white/20 cyber-glow">
+          <CardHeader className="text-center">
+            <CardTitle className="text-2xl md:text-3xl font-orbitron text-gradient">
+              Join VidLinkGen
+            </CardTitle>
+            <CardDescription>
+              Login or create an account to start generating secure links.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Tabs defaultValue="login" className="w-full">
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="login">Login</TabsTrigger>
+                <TabsTrigger value="register">Register</TabsTrigger>
+              </TabsList>
+              <TabsContent value="login" className="space-y-4 pt-4">
+                <div className="space-y-2">
+                  <Label htmlFor="email-login">Email</Label>
+                  <Input id="email-login" type="email" value={authData.email} onChange={(e) => setAuthData({ ...authData, email: e.target.value })} placeholder="Enter your email" disabled={loading} />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="password-login">Password</Label>
+                  <Input id="password-login" type="password" value={authData.password} onChange={(e) => setAuthData({ ...authData, password: e.target.value })} placeholder="Enter your password" disabled={loading} />
+                </div>
+                <Button onClick={handleLogin} className="w-full cyber-glow" disabled={loading}>{loading ? 'Logging in...' : 'Login'}</Button>
+              </TabsContent>
+              <TabsContent value="register" className="space-y-4 pt-4">
+                <div className="space-y-2">
+                  <Label htmlFor="name-reg">Name</Label>
+                  <Input id="name-reg" value={authData.name} onChange={(e) => setAuthData({ ...authData, name: e.target.value })} placeholder="Enter your name" disabled={loading} />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="email-reg">Email</Label>
+                  <Input id="email-reg" type="email" value={authData.email} onChange={(e) => setAuthData({ ...authData, email: e.target.value })} placeholder="Enter your email" disabled={loading} />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="password-reg">Password</Label>
+                  <Input id="password-reg" type="password" value={authData.password} onChange={(e) => setAuthData({ ...authData, password: e.target.value })} placeholder="Create a password" disabled={loading} />
+                </div>
+                <Button onClick={handleRegister} className="w-full cyber-glow" disabled={loading}>{loading ? 'Creating Account...' : 'Create Account'}</Button>
+              </TabsContent>
+            </Tabs>
+          </CardContent>
+        </Card>
+      </motion.div>
+    </div>
+  );
+};
+
+export default Auth;
