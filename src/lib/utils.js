@@ -1,4 +1,3 @@
-
 import { clsx } from "clsx"
 import { twMerge } from "tailwind-merge"
 
@@ -6,7 +5,7 @@ export function cn(...inputs) {
   return twMerge(clsx(inputs))
 }
 
-export const generateShortId = (length = 4) => {
+export const generateShortId = (length = 7) => {
   const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
   let result = '';
   for (let i = 0; i < length; i++) {
