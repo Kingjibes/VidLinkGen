@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 
-const UrlTab = ({ user, handleUrlSubmit, initialUrl = '', triggerAuthModal }) => {
+const UrlTab = ({ user, initialUrl = '', triggerAuthModal }) => {
   const [url, setUrl] = useState(initialUrl);
 
   useEffect(() => {
@@ -11,20 +11,13 @@ const UrlTab = ({ user, handleUrlSubmit, initialUrl = '', triggerAuthModal }) =>
   }, [initialUrl]);
 
   const onInputChange = (e) => {
-    if (!user) {
+    if (!user && e.target.value) {
       triggerAuthModal();
       return;
     }
     setUrl(e.target.value);
   };
 
-  const onButtonClick = () => {
-    if (!user) {
-      triggerAuthModal();
-      return;
-    }
-    handleUrlSubmit();
-  };
 
   return (
     <div className="space-y-3 md:space-y-4">
@@ -36,11 +29,9 @@ const UrlTab = ({ user, handleUrlSubmit, initialUrl = '', triggerAuthModal }) =>
           className="bg-background/50 text-sm md:text-base"
           value={url}
           onChange={onInputChange}
+          disabled={!user && !initialUrl}
         />
       </div>
-      <Button onClick={onButtonClick} className="w-full cyber-glow text-sm md:text-base">
-        {initialUrl ? "Update Link from URL" : "Generate Secure Link from URL"}
-      </Button>
     </div>
   );
 };
