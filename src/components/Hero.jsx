@@ -1,102 +1,94 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Shield, Zap, Lock, Users, ArrowRight, Crown } from 'lucide-react';
-import config from '@/config';
+import { Shield, Lock, Zap, UploadCloud, Crown } from 'lucide-react';
 
 const Hero = ({ setCurrentView, user }) => {
   const handleGetStarted = () => {
     if (user) {
-      setCurrentView('home'); 
+      const generatorSection = document.getElementById('video-generator-section');
+      if (generatorSection) {
+        generatorSection.scrollIntoView({ behavior: 'smooth' });
+      }
     } else {
       setCurrentView('auth');
     }
   };
 
   return (
-    <section className="relative min-h-screen flex items-center justify-center text-center overflow-hidden bg-space-pattern py-20 md:py-32 px-4">
-      <div className="absolute inset-0 bg-gradient-to-br from-background via-transparent to-background opacity-50"></div>
+    <section className="relative min-h-screen flex items-center justify-center py-20 md:py-32 bg-gradient-to-br from-background via-background/80 to-purple-900/30 overflow-hidden">
+      <div className="absolute inset-0 bg-space-pattern opacity-30"></div>
+      <div className="absolute inset-0 bg-gradient-to-b from-transparent to-background/50"></div>
       
       <motion.div 
-        className="relative z-10 max-w-4xl mx-auto"
-        initial={{ opacity: 0, y: 30 }}
+        className="container mx-auto px-4 text-center relative z-10"
+        initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.8, ease: "easeOut" }}
+        transition={{ duration: 0.8 }}
       >
-        <div className="mb-6 md:mb-8">
-          <Badge variant="outline" className="text-sm sm:text-base bg-blue-500/10 border-blue-500/30 text-blue-300 py-2 px-4 rounded-full shadow-lg">
-            <Shield className="h-4 w-4 sm:h-5 sm:w-5 mr-2 text-blue-400" />
-            Military-Grade Video Security
-          </Badge>
+        <div className="flex justify-center mb-6">
+          <Shield className="h-16 w-16 md:h-20 md:w-20 text-blue-500 animate-pulse" />
         </div>
-
-        <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-orbitron font-extrabold mb-6 md:mb-8 text-gradient leading-tight">
-          VidLinkGen
+        <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-orbitron font-bold mb-6 md:mb-8">
+          <span className="text-gradient">VidLink</span><span className="text-gradient-secondary">Gen</span>
         </h1>
-        <p className="text-lg sm:text-xl md:text-2xl text-muted-foreground mb-8 md:mb-12 max-w-2xl mx-auto">
+        <p className="text-lg sm:text-xl md:text-2xl text-muted-foreground max-w-3xl mx-auto mb-8 md:mb-10">
           Securely share your videos with password protection, expiry dates, and robust encryption. Powered by CIPHERTECH.
         </p>
-
-        <div className="flex flex-col sm:flex-row items-center justify-center gap-4 md:gap-6 mb-10 md:mb-14">
+        <div className="flex flex-col sm:flex-row justify-center items-center space-y-4 sm:space-y-0 sm:space-x-4 mb-12 md:mb-16">
           <Button 
+            size="lg" 
+            className="w-full sm:w-auto text-base md:text-lg px-8 py-6 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-300"
             onClick={handleGetStarted}
-            className="w-full sm:w-auto text-base md:text-lg font-semibold px-8 py-3 md:px-10 md:py-4 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white rounded-lg shadow-xl hover:shadow-2xl transform hover:scale-105 transition-all duration-300 ease-in-out cyber-glow"
           >
-            Get Started Now <ArrowRight className="ml-2 h-5 w-5" />
+            Get Started Now
           </Button>
           <Button 
+            size="lg" 
             variant="outline" 
+            className="w-full sm:w-auto text-base md:text-lg px-8 py-6 border-2 border-blue-500/50 text-blue-400 hover:bg-blue-500/10 hover:text-blue-300 hover:border-blue-500/70 transform hover:scale-105 transition-all duration-300"
             onClick={() => setCurrentView('features')}
-            className="w-full sm:w-auto text-base md:text-lg font-semibold px-8 py-3 md:px-10 md:py-4 border-gradient text-foreground rounded-lg shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-300 ease-in-out"
           >
             View Features
           </Button>
         </div>
-        
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 md:gap-6 text-left mb-10 md:mb-14 text-xs sm:text-sm">
+        <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 max-w-4xl mx-auto text-left">
           {[
             { icon: Lock, text: "Password Protection" },
-            { icon: Zap, text: "2GB Max File Size (Free)" },
+            { icon: UploadCloud, text: "500MB Max File Size (Free)" },
             { icon: Shield, text: "256-bit Encryption" },
-            { icon: Users, text: "99.9% Uptime" }
-          ].map((item, idx) => (
-            <div key={idx} className="flex items-center space-x-2 p-2 md:p-3 bg-white/5 rounded-lg border border-white/10">
-              <item.icon className="h-4 w-4 sm:h-5 sm:w-5 text-blue-400 flex-shrink-0" />
-              <span className="text-muted-foreground">{item.text}</span>
-            </div>
+            { icon: Zap, text: "99.9% Uptime" },
+          ].map((item, index) => (
+            <motion.div 
+              key={index}
+              className="glass-effect p-4 rounded-lg border border-white/10 flex items-center space-x-3 hover:border-blue-500/30 transition-colors duration-300"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.2 + index * 0.1 }}
+            >
+              <item.icon className="h-5 w-5 text-blue-400 flex-shrink-0" />
+              <span className="text-sm md:text-base text-muted-foreground">{item.text}</span>
+            </motion.div>
           ))}
         </div>
-
-         {!user?.is_premium && (
-          <div className="mb-10 md:mb-14">
+        {!user?.is_premium && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.8 }}
+            className="mt-12 md:mt-16"
+          >
             <Button 
               onClick={() => setCurrentView('features')}
-              className="w-full sm:w-auto text-base md:text-lg font-semibold px-8 py-3 md:px-10 md:py-4 bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 text-black rounded-lg shadow-xl hover:shadow-2xl transform hover:scale-105 transition-all duration-300 ease-in-out"
+              className="w-full max-w-md mx-auto text-base md:text-lg px-8 py-6 bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 text-black font-semibold shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-300 flex items-center justify-center"
             >
-              <Crown className="mr-2 h-5 w-5" /> Upgrade to Premium for {config.premiumPrice}
+              <Crown className="h-5 w-5 mr-2" />
+              Upgrade to Premium for
             </Button>
-            <p className="text-xs text-muted-foreground mt-2">Unlock 2TB uploads, advanced encryption, and more!</p>
-          </div>
+            <p className="text-sm text-muted-foreground mt-2">Unlock 2TB uploads, advanced encryption, and more!</p>
+          </motion.div>
         )}
-
-
-        <div className="flex items-center justify-center">
-          <Badge variant="outline" className="text-xs sm:text-sm bg-yellow-500/10 border-yellow-500/30 text-yellow-300 py-1 px-2 rounded-full shadow-md">
-            <Crown className="h-3 w-3 sm:h-4 sm:w-4 mr-1 text-yellow-400" />
-            Premium: 2TB files + Advanced encryption
-          </Badge>
-        </div>
-
       </motion.div>
-
-      <div className="absolute bottom-0 left-0 w-full h-1/3 bg-gradient-to-t from-background to-transparent pointer-events-none"></div>
-      <div className="absolute top-0 left-0 w-1/2 h-1/2 opacity-20 animate-pulse-slow">
-        <div className="w-full h-full rounded-full bg-blue-600 blur-[100px]"></div>
-      </div>
-      <div className="absolute bottom-0 right-0 w-1/2 h-1/2 opacity-20 animate-pulse-slow animation-delay-2000">
-        <div className="w-full h-full rounded-full bg-purple-600 blur-[100px]"></div>
-      </div>
     </section>
   );
 };

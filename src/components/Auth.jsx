@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
@@ -9,7 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { supabase } from '@/lib/supabase';
 import { useToast } from "@/components/ui/use-toast";
 
-const Auth = ({ setUser, setCurrentView, onSuccessfulRegister }) => {
+const Auth = ({ setUserState, setCurrentView, onSuccessfulRegister, processUserProfile }) => {
   const [authData, setAuthData] = useState({ email: '', password: '', name: '' });
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
@@ -33,7 +32,7 @@ const Auth = ({ setUser, setCurrentView, onSuccessfulRegister }) => {
         .select('*')
         .eq('id', data.user.id)
         .single();
-      setUser({ ...data.user, ...profile });
+      setUserState(processUserProfile({ ...data.user, ...profile }));
       setAuthData({ email: '', password: '', name: '' });
       setCurrentView('dashboard');
       toast({ title: "Login Successful!", description: `Welcome back, ${profile?.name || 'User'}!`, variant: "default" });
@@ -67,7 +66,7 @@ const Auth = ({ setUser, setCurrentView, onSuccessfulRegister }) => {
         .single();
       setAuthData({ email: '', password: '', name: '' });
       toast({ title: "Registration Successful!", description: "Please check your email to verify your account.", variant: "default" });
-      onSuccessfulRegister({ ...data.user, ...profile }); 
+      onSuccessfulRegister(processUserProfile({ ...data.user, ...profile })); 
     }
     setLoading(false);
   };
