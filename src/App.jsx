@@ -10,6 +10,7 @@ import WhatsappModal from '@/components/WhatsappModal';
 import Auth from '@/components/Auth';
 import VideoPlayer from '@/components/VideoPlayer';
 import DetailedAnalytics from '@/components/DetailedAnalytics';
+import SupportModal from '@/components/SupportModal';
 import { supabase } from '@/lib/supabase';
 import { useToast } from "@/components/ui/use-toast";
 import { Button } from "@/components/ui/button";
@@ -24,20 +25,43 @@ function App() {
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [showPremiumModal, setShowPremiumModal] = useState(false);
   const [premiumModalFeature, setPremiumModalFeature] = useState('');
+  const [showSupportModal, setShowSupportModal] = useState(false);
   const { toast } = useToast();
+
+  const processUserProfile = (profileData) => {
+    if (!profileData) return null;
+    
+    let isActivePremium = profileData.is_premium;
+    if (profileData.premium_expiry_date) {
+      const expiryDate = new Date(profileData.premium_expiry_date);
+      if (expiryDate < new Date()) {
+        isActivePremium = false; 
+      }
+    } else if (profileData.is_premium && !profileData.premium_tier) {
+      //This case is for legacy premium users who don't have a tier or expiry date
+      isActivePremium = true; 
+    } else if (!profileData.is_premium) {
+      isActivePremium = false;
+    }
+
+    return { ...profileData, is_premium: isActivePremium };
+  };
 
 
   useEffect(() => {
     const handleUrlChange = async () => {
       const path = window.location.pathname;
+      const queryParams = new URLSearchParams(window.location.search);
+      const editLinkIdFromQuery = queryParams.get('edit');
+
       if (path.startsWith('/v/')) {
-        const linkId = path.split('/v/')[1];
-        if (linkId) {
-          setViewParams({ linkId });
+        const shortUrlId = path.split('/v/')[1];
+        if (shortUrlId) {
+          setViewParams({ shortUrlId }); // Pass shortUrlId to VideoPlayer
           setCurrentView('videoPlayer');
         }
       } else if (path.startsWith('/analytics/')) {
-        const linkId = path.split('/analytics/')[1];
+        const linkId = path.split('/analytics/')[1]; // This is the DB UUID
         if (linkId) {
           setViewParams({ linkId });
           setCurrentView('detailedAnalytics');
@@ -45,6 +69,11 @@ function App() {
       } else {
         const viewFromPath = path.substring(1) || 'home';
         setCurrentView(viewFromPath);
+        if (editLinkIdFromQuery && viewFromPath === 'home') {
+          setViewParams({ editLinkId: editLinkIdFromQuery });
+        } else {
+          setViewParams(null);
+        }
       }
     };
     
@@ -59,7 +88,7 @@ function App() {
           .select('*')
           .eq('id', session.user.id)
           .single();
-        setUser({ ...session.user, ...profile });
+        setUser(processUserProfile({ ...session.user, ...profile }));
       }
     };
     getSession();
@@ -72,7 +101,7 @@ function App() {
             .select('*')
             .eq('id', session.user.id)
             .single();
-          setUser({ ...session.user, ...profile });
+          setUser(processUserProfile({ ...session.user, ...profile }));
         } else {
           setUser(null);
         }
@@ -86,15 +115,18 @@ function App() {
   }, []);
 
   const changeView = (view, params = null) => {
-    let path;
-    if (view === 'videoPlayer' && params?.linkId) {
-      path = `/v/${params.linkId}`;
-    } else if (view === 'detailedAnalytics' && params?.linkId) {
+    let path = `/${view === 'home' ? '' : view}`;
+    let query = '';
+
+    if (view === 'videoPlayer' && params?.shortUrlId) { // Expect shortUrlId for navigation
+      path = `/v/${params.shortUrlId}`;
+    } else if (view === 'detailedAnalytics' && params?.linkId) { // Expect DB UUID
       path = `/analytics/${params.linkId}`;
-    } else {
-      path = `/${view === 'home' ? '' : view}`;
+    } else if (view === 'home' && params?.editLinkId) {
+      query = `?edit=${params.editLinkId}`;
     }
-    window.history.pushState({ view, params }, '', path);
+    
+    window.history.pushState({ view, params }, '', `${path}${query}`);
     setCurrentView(view);
     setViewParams(params);
   };
@@ -121,7 +153,7 @@ function App() {
           .select('*')
           .eq('id', user.id)
           .single();
-        setUser(prevUser => ({ ...prevUser, ...profile }));
+        setUser(prevUser => processUserProfile({ ...prevUser, ...profile }));
         toast({
           title: "Welcome Aboard!",
           description: "You've successfully joined our community channels.",
@@ -136,20 +168,30 @@ function App() {
     setPremiumModalFeature(featureName);
     setShowPremiumModal(true);
   };
+  const triggerSupportModal = () => {
+    if (user && user.is_premium) {
+      setShowSupportModal(true);
+    } else if (user && !user.is_premium) {
+      triggerPremiumModal("24/7 Priority Support");
+    } else {
+      triggerAuthModal();
+    }
+  };
+
 
   const renderCurrentView = () => {
-    const editLinkId = viewParams?.editLinkId;
+    const editLinkIdForGenerator = currentView === 'home' ? viewParams?.editLinkId : null;
     switch (currentView) {
       case 'dashboard':
         return user ? <Dashboard user={user} setCurrentView={changeView} triggerPremiumModal={triggerPremiumModal} /> : <Hero setCurrentView={changeView} user={user} />;
       case 'features':
-        return <Features user={user} setCurrentView={changeView} />;
+        return <Features user={user} setCurrentView={changeView} triggerSupportModal={triggerSupportModal} />;
       case 'admin':
         return user?.role === 'admin' ? <AdminPanel user={user} /> : <Hero setCurrentView={changeView} user={user} />;
       case 'auth':
-        return <Auth setUser={setUser} setCurrentView={changeView} onSuccessfulRegister={handleSuccessfulRegister} />;
+        return <Auth setUserState={setUser} setCurrentView={changeView} onSuccessfulRegister={handleSuccessfulRegister} processUserProfile={processUserProfile} />;
       case 'videoPlayer':
-        return <VideoPlayer linkId={viewParams?.linkId} user={user} setCurrentView={changeView} />;
+        return <VideoPlayer shortUrlId={viewParams?.shortUrlId} user={user} setCurrentView={changeView} />;
       case 'detailedAnalytics':
         return user ? <DetailedAnalytics linkId={viewParams?.linkId} user={user} setCurrentView={changeView} /> : <Hero setCurrentView={changeView} user={user} />;
       case 'home':
@@ -159,9 +201,10 @@ function App() {
             <Hero setCurrentView={changeView} user={user} />
             <VideoGenerator 
               user={user} 
-              editLinkId={editLinkId} 
+              editLinkId={editLinkIdForGenerator} 
               triggerAuthModal={triggerAuthModal}
               triggerPremiumModal={triggerPremiumModal}
+              setCurrentView={changeView}
             />
           </>
         );
@@ -182,6 +225,7 @@ function App() {
       </main>
       <Toaster />
       <WhatsappModal open={showWhatsappModal} onFinished={handleModalFinished} />
+      <SupportModal open={showSupportModal} onOpenChange={setShowSupportModal} user={user} />
 
       <Dialog open={showAuthModal} onOpenChange={setShowAuthModal}>
         <DialogContent className="glass-effect border-yellow-500/30">
@@ -192,7 +236,7 @@ function App() {
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="sm:justify-center">
-            <Button onClick={() => { setShowAuthModal(false); setCurrentView('auth'); }} className="cyber-glow">
+            <Button onClick={() => { setShowAuthModal(false); changeView('auth'); }} className="cyber-glow">
               Login / Register
             </Button>
             <Button variant="outline" onClick={() => setShowAuthModal(false)}>Cancel</Button>
@@ -211,7 +255,7 @@ function App() {
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="sm:justify-center">
-            <Button onClick={() => { setShowPremiumModal(false); setCurrentView('features'); }} className="bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 text-black font-semibold">
+            <Button onClick={() => { setShowPremiumModal(false); changeView('features'); }} className="bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 text-black font-semibold">
               Upgrade to Premium
             </Button>
             <Button variant="outline" onClick={() => setShowPremiumModal(false)}>Maybe Later</Button>
