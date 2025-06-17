@@ -15,16 +15,30 @@ const FileUploadTab = ({ user, isUploading, uploadProgress, handleFileUpload, tr
   };
 
   const getUploadLimitText = () => {
-    if (!user) return `${(config.uploadLimits.free / (1024*1024)).toFixed(0)}MB`; // Default to free limit if no user
-    if (user.is_premium && user.premium_tier) {
-      const limit = config.uploadLimits[user.premium_tier] || config.uploadLimits.legacy_premium; // Fallback for older premium
-      if (limit >= 1024 * 1024 * 1024 * 1024) { // TB
-        return `${(limit / (1024*1024*1024*1024)).toFixed(0)}TB`;
-      } else { // GB
-        return `${(limit / (1024*1024*1024)).toFixed(0)}GB`;
-      }
+    let limit;
+    let unit;
+
+    if (!user) {
+      limit = config.uploadLimits.free;
+    } else if (user.is_premium && user.premium_tier && config.uploadLimits[user.premium_tier]) {
+      limit = config.uploadLimits[user.premium_tier];
+    } else if (user.is_premium) { // Legacy premium without a specific tier
+      limit = config.uploadLimits.legacy_premium;
+    } else {
+      limit = config.uploadLimits.free;
     }
-    return `${(config.uploadLimits.free / (1024*1024)).toFixed(0)}MB`;
+
+    if (limit >= 1024 * 1024 * 1024 * 1024) { // TB
+      unit = 'TB';
+      limit = (limit / (1024 * 1024 * 1024 * 1024));
+    } else if (limit >= 1024 * 1024 * 1024) { // GB
+      unit = 'GB';
+      limit = (limit / (1024 * 1024 * 1024));
+    } else { // MB
+      unit = 'MB';
+      limit = (limit / (1024 * 1024));
+    }
+    return `${limit.toFixed(0)}${unit}`;
   };
 
 

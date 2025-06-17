@@ -52,6 +52,7 @@ const createNewLink = async (linkPayload, allowedEmails, toast) => {
   const previewDomain = window.location.origin;
   const shortId = generateShortId();
   linkPayload.url = `${previewDomain}/v/${shortId}`;
+  linkPayload.short_url_id = shortId; 
 
   const { data, error } = await supabase.from('video_links').insert(linkPayload).select('*, video_link_permissions(user_email)').single();
 
@@ -68,6 +69,21 @@ const createNewLink = async (linkPayload, allowedEmails, toast) => {
 };
 
 const updateExistingLink = async (editLinkId, linkPayload, allowedEmails, toast) => {
+  if (!linkPayload.short_url_id) {
+    const { data: existingLink } = await supabase.from('video_links').select('short_url_id, url').eq('id', editLinkId).single();
+    if (existingLink && existingLink.short_url_id) {
+      linkPayload.short_url_id = existingLink.short_url_id;
+      linkPayload.url = existingLink.url; 
+    } else if (!linkPayload.url?.includes('/v/')) { 
+        const shortId = generateShortId();
+        linkPayload.url = `${window.location.origin}/v/${shortId}`;
+        linkPayload.short_url_id = shortId;
+    } else if (linkPayload.url?.includes('/v/')) {
+        linkPayload.short_url_id = linkPayload.url.split('/v/')[1];
+    }
+  }
+
+
   const { data, error } = await supabase
     .from('video_links')
     .update(linkPayload)
@@ -126,19 +142,26 @@ export const processSaveLink = async ({
   }
 
   if (isEditing && editLinkId) {
-    if (sourceType === 'upload') {
+    if (sourceType === 'upload') { // File was just uploaded, so source is new
       finalLinkPayload.source = providedSource;
-    } else if (sourceType === 'url') {
+    } else if (sourceType === 'url') { // URL potentially changed
       if (providedSource && providedSource.trim() !== '' && providedSource !== editingLinkOriginalSource) {
         finalLinkPayload.source = providedSource;
       } else {
         finalLinkPayload.source = editingLinkOriginalSource; 
       }
-    } else {
+    } else { // No new source, keep original (this case might be redundant if sourceType always upload/url)
        finalLinkPayload.source = editingLinkOriginalSource;
     }
+    
+    const { data: currentLink } = await supabase.from('video_links').select('url, short_url_id').eq('id', editLinkId).single();
+    if (currentLink) {
+        finalLinkPayload.url = currentLink.url;
+        finalLinkPayload.short_url_id = currentLink.short_url_id;
+    }
+
     return await updateExistingLink(editLinkId, finalLinkPayload, linkSettings.allowedEmails, toast);
-  } else {
+  } else { // Creating new link
     if (sourceType === 'url' && (!providedSource || providedSource.trim() === '')) {
       toast({ title: "URL Required", description: "Please enter a video URL to generate a link.", variant: "destructive" });
       return { data: null, error: { message: "URL is required for new link from URL source." } };
@@ -159,25 +182,34 @@ export const handleFileUploadToSupabase = async ({
   toast,
   triggerPremiumModal
 }) => {
-  let maxSize = config.uploadLimits.free;
-  let tierSpecificLimitText = `${(maxSize / (1024*1024)).toFixed(0)}MB`;
+  let maxSize;
+  let tierSpecificLimitText;
 
-  if (user.is_premium && user.premium_tier) {
-    maxSize = config.uploadLimits[user.premium_tier] || config.uploadLimits.legacy_premium;
-    if (maxSize >= 1024 * 1024 * 1024 * 1024) { // TB
-        tierSpecificLimitText = `${(maxSize / (1024*1024*1024*1024)).toFixed(0)}TB`;
-    } else { // GB
-        tierSpecificLimitText = `${(maxSize / (1024*1024*1024)).toFixed(0)}GB`;
-    }
+  if (user.is_premium && user.premium_tier && config.uploadLimits[user.premium_tier]) {
+    maxSize = config.uploadLimits[user.premium_tier];
+  } else if (user.is_premium) { // Legacy premium user
+    maxSize = config.uploadLimits.legacy_premium; 
+  } else { // Free user
+    maxSize = config.uploadLimits.free;
+  }
+
+  // Format maxSize into TB/GB/MB text for display
+  if (maxSize >= 1024 * 1024 * 1024 * 1024) { // TB
+      tierSpecificLimitText = `${(maxSize / (1024*1024*1024*1024)).toFixed(0)}TB`;
+  } else if (maxSize >= 1024 * 1024 * 1024) { // GB
+      tierSpecificLimitText = `${(maxSize / (1024*1024*1024)).toFixed(0)}GB`;
+  } else { // MB
+      tierSpecificLimitText = `${(maxSize / (1024*1024)).toFixed(0)}MB`;
   }
 
 
   if (file.size > maxSize) {
     if (!user.is_premium) {
-      triggerPremiumModal(`File Upload Limit (Free: ${tierSpecificLimitText})`);
+      triggerPremiumModal(`File Upload Limit (Free: ${(config.uploadLimits.free / (1024*1024)).toFixed(0)}MB)`);
     } else {
-      toast({ title: "File Too Large", description: `Your current plan limit is ${tierSpecificLimitText}.`, variant: "destructive" });
+      toast({ title: "File Too Large", description: `Your current plan limit is ${tierSpecificLimitText}. This file exceeds that.`, variant: "destructive" });
     }
+    onProgress(0);
     return { publicUrl: null, error: { message: "File too large" } };
   }
 
@@ -188,8 +220,10 @@ export const handleFileUploadToSupabase = async ({
       cacheControl: '3600',
       upsert: false,
       onUploadProgress: (progressEvent) => {
-        const percentUploaded = Math.round((progressEvent.loaded / progressEvent.total) * 100);
-        onProgress(percentUploaded);
+        if (progressEvent.total) {
+            const percentUploaded = Math.round((progressEvent.loaded / progressEvent.total) * 100);
+            onProgress(percentUploaded);
+        }
       }
     });
 
@@ -202,8 +236,10 @@ export const handleFileUploadToSupabase = async ({
   const { data: publicUrlData } = supabase.storage.from('videos').getPublicUrl(fileName);
   if (!publicUrlData || !publicUrlData.publicUrl) {
     toast({ title: "Error", description: "Could not get public URL for the uploaded file.", variant: "destructive" });
+    onProgress(0);
     return { publicUrl: null, error: { message: "Error getting public URL" } };
   }
   
+  onProgress(100); // Ensure progress hits 100 on success
   return { publicUrl: publicUrlData.publicUrl, error: null };
 };
