@@ -1,17 +1,18 @@
 const config = {
   siteName: "VidLinkGen",
   contact: {
-    email: "support@vidlinkgen.com",
+    email: "richvybs7@gmail.com",
     twitter: "@vidlinkgen",
     whatsappNumbers: [
-      { id: 'whatsapp1', number: '+15551234567', channelUrl: 'https://whatsapp.com/channel/YOUR_CHANNEL_URL_1' },
-      { id: 'whatsapp2', number: '+15557654321', channelUrl: 'https://whatsapp.com/channel/YOUR_CHANNEL_URL_2' },
+      { id: 'main', number: '+233557488116', channelUrl: 'https://whatsapp.com/channel/0029Vb3wqli8V0tfOrWXwk2K' },
+      { id: 'main2', number: '+233504759307', channelUrl: 'https://whatsapp.com/channel/0029VbAUgm5Fi8xfcJspqi3f' },
+      { channelUrl: 'https://whatsapp.com/channel/0029VaN2eQQ59PwNixDnvD16' },
     ],
     telegramHandles: [
-      { id: 'telegram1', username: 'vidlinkgen_support', link: 'https://t.me/vidlinkgen_support' },
-      { id: 'telegram2', username: 'vidlinkgen_sales', link: 'https://t.me/vidlinkgen_sales' },
+      { id: 'ʜᴀᴄᴋᴇʀᴘʀᴏ', username: 'Vidlinkgen_support', link: 'https://t.me/HACK_ERPRO' },
+      { id: 'ʜᴀᴄᴋᴇʀᴘʀᴏ', username: 'vidlinkgen_sales', link: 'https://t.me/Richvybs6' },
     ],
-    momoNumber: "024XXXXXXX",
+    momoNumber: "0557488116",
   },
   premiumPrices: {
     individual_monthly: {
