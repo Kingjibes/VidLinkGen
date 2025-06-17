@@ -4,14 +4,16 @@ import { supabase } from '@/lib/supabase';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { ShieldQuestion, Lock, Unlock, EyeOff, Download, PlayCircle, XCircle } from 'lucide-react';
+import { ShieldQuestion, Lock, Unlock, EyeOff, Download, PlayCircle, XCircle, UserCheck } from 'lucide-react';
 import { useToast } from "@/components/ui/use-toast";
 
-const VideoPlayer = ({ shortUrlId, user, setCurrentView }) => { // Changed prop name to shortUrlId
+const VideoPlayer = ({ shortUrlId, user, setCurrentView }) => { 
   const [videoData, setVideoData] = useState(null);
   const [password, setPassword] = useState('');
   const [isPasswordProtected, setIsPasswordProtected] = useState(false);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isAuthenticatedByPassword, setIsAuthenticatedByPassword] = useState(false);
+  const [isAuthenticatedByEmail, setIsAuthenticatedByEmail] = useState(false);
+  const [requiresEmailAuth, setRequiresEmailAuth] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const videoRef = useRef(null);
@@ -45,7 +47,6 @@ const VideoPlayer = ({ shortUrlId, user, setCurrentView }) => { // Changed prop 
       const deviceType = simulateDeviceType(userAgent);
       const country = simulateCountry();
 
-      // Insert into click tracking table
       await supabase.from('video_link_clicks').insert({ 
         link_id: dbLinkId,
         user_agent: userAgent,
@@ -53,7 +54,6 @@ const VideoPlayer = ({ shortUrlId, user, setCurrentView }) => { // Changed prop 
         device_type: deviceType
       });
 
-      // Increment the general clicks count on video_links table using RPC
       const { error: rpcError } = await supabase.rpc('increment_clicks', { row_id: dbLinkId });
       if (rpcError) {
         console.error("Error calling increment_clicks RPC:", rpcError);
@@ -74,13 +74,12 @@ const VideoPlayer = ({ shortUrlId, user, setCurrentView }) => { // Changed prop 
         return;
       }
       
-      // Construct the full URL based on the shortUrlId to query the 'url' column
       const expectedUrl = `${window.location.origin}/v/${shortUrlId}`;
 
       const { data, error: fetchError } = await supabase
         .from('video_links')
-        .select('id, source, custom_name, description, password, expiry_date, is_encrypted, video_link_permissions(user_email)') // Fetch 'id'
-        .eq('url', expectedUrl) // Query using the full URL
+        .select('id, source, custom_name, description, password, expiry_date, is_encrypted, video_link_permissions(user_email)')
+        .eq('url', expectedUrl)
         .single();
 
       if (fetchError || !data) {
@@ -97,36 +96,55 @@ const VideoPlayer = ({ shortUrlId, user, setCurrentView }) => { // Changed prop 
         return;
       }
       
-      setVideoData(data); // data.id is the DB UUID
+      setVideoData(data);
       setIsPasswordProtected(!!data.password);
+      setRequiresEmailAuth(data.video_link_permissions && data.video_link_permissions.length > 0);
 
-      if (!data.password) {
-        if (data.video_link_permissions && data.video_link_permissions.length > 0) {
-          if (!user || !data.video_link_permissions.some(p => p.user_email === user.email)) {
-            setError("You do not have permission to view this video.");
-            setIsAuthenticated(false);
-          } else {
-            setIsAuthenticated(true);
-            if (data.id) recordClick(data.id); // Record click if authenticated by email permission
-          }
+      let canView = false;
+
+      if (data.password) { // Password takes precedence for initial check
+        // User will need to enter password
+      } else if (data.video_link_permissions && data.video_link_permissions.length > 0) {
+        if (user && data.video_link_permissions.some(p => p.user_email === user.email)) {
+          setIsAuthenticatedByEmail(true);
+          canView = true;
         } else {
-          setIsAuthenticated(true); // Public link or no specific email permissions
-          if (data.id) recordClick(data.id); // Record click for public non-password protected
+          // Requires login or email is not authorized
         }
+      } else { // Public link (no password, no email restrictions)
+        canView = true;
       }
+      
+      if (canView) {
+        if (data.id) recordClick(data.id);
+      }
+      
       setIsLoading(false);
     };
 
     fetchVideoData();
-  }, [shortUrlId, user]); // Depend on shortUrlId
+  }, [shortUrlId, user]);
 
   const handlePasswordSubmit = async (e) => {
     e.preventDefault();
     if (password === videoData?.password) {
-      setIsAuthenticated(true);
+      setIsAuthenticatedByPassword(true);
       setError(null);
-      if (videoData && videoData.id) {
-        await recordClick(videoData.id); // Record click after successful password auth
+      if (videoData?.id) { // Check if videoData.id is defined
+        // If email auth is also required, check it now
+        if (requiresEmailAuth) {
+          if (user && videoData.video_link_permissions.some(p => p.user_email === user.email)) {
+            setIsAuthenticatedByEmail(true);
+            await recordClick(videoData.id);
+          } else {
+            // Password correct, but email not authorized (or user not logged in)
+            // This scenario should ideally be handled more gracefully, e.g., prompt login if not already.
+            setError("Password correct, but email authorization failed or you are not logged in with an authorized account.");
+            setIsAuthenticatedByPassword(false); // Reset password auth as overall auth failed
+          }
+        } else { // Password correct, no email auth needed
+          await recordClick(videoData.id);
+        }
       }
     } else {
       setError("Incorrect password.");
@@ -158,6 +176,9 @@ const VideoPlayer = ({ shortUrlId, user, setCurrentView }) => { // Changed prop 
     document.body.removeChild(link);
     toast({ title: "Download Started", description: "Your video download has begun.", variant: "default" });
   };
+  
+  const fullyAuthenticated = (isPasswordProtected ? isAuthenticatedByPassword : true) && (requiresEmailAuth ? isAuthenticatedByEmail : true);
+
 
   if (isLoading) {
     return (
@@ -169,7 +190,7 @@ const VideoPlayer = ({ shortUrlId, user, setCurrentView }) => { // Changed prop 
     );
   }
 
-  if (error && !videoData?.password) { 
+  if (error && !isPasswordProtected && !requiresEmailAuth) { 
     return (
       <div className="min-h-screen flex items-center justify-center bg-space-pattern p-4">
         <Card className="w-full max-w-md glass-effect border-red-500/50">
@@ -187,8 +208,7 @@ const VideoPlayer = ({ shortUrlId, user, setCurrentView }) => { // Changed prop 
     );
   }
 
-
-  if (isPasswordProtected && !isAuthenticated) {
+  if (isPasswordProtected && !isAuthenticatedByPassword) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-space-pattern p-4">
         <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }}>
@@ -220,25 +240,38 @@ const VideoPlayer = ({ shortUrlId, user, setCurrentView }) => { // Changed prop 
     );
   }
 
-  if (!isAuthenticated && videoData?.video_link_permissions?.length > 0) {
-     return (
+  if (requiresEmailAuth && !isAuthenticatedByEmail && (!isPasswordProtected || (isPasswordProtected && isAuthenticatedByPassword))) {
+     // This case means: email auth is required, user hasn't passed it,
+     // AND (either no password was needed OR password was needed and passed)
+     // So, the only remaining hurdle is email.
+    return (
       <div className="min-h-screen flex items-center justify-center bg-space-pattern p-4">
         <Card className="w-full max-w-md glass-effect border-red-500/50">
           <CardHeader>
-            <CardTitle className="text-red-400 flex items-center"><EyeOff className="mr-2" /> Access Denied</CardTitle>
+            <CardTitle className="text-red-400 flex items-center"><UserCheck className="mr-2" /> Email Verification Required</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-red-200">You do not have permission to view this video. Please log in with an authorized account.</p>
-            <Button onClick={() => setCurrentView('auth')} className="w-full mt-6 cyber-glow-red">
-              Login
-            </Button>
+            <p className="text-red-200">
+              This video is restricted to specific email addresses. 
+              {user ? " Your current email is not authorized." : " Please log in with an authorized account to view."}
+            </p>
+            {!user && 
+              <Button onClick={() => setCurrentView('auth')} className="w-full mt-6 cyber-glow-red">
+                Login to Verify Email
+              </Button>
+            }
+             {user && 
+                <Button onClick={() => setCurrentView('home')} className="w-full mt-6 cyber-glow-red">
+                    Go to Home
+                </Button>
+             }
           </CardContent>
         </Card>
       </div>
     );
   }
   
-  if (!videoData?.source) {
+  if (!videoData?.source && fullyAuthenticated) { // Check for source only if authenticated
      return (
       <div className="min-h-screen flex items-center justify-center bg-space-pattern p-4">
         <Card className="w-full max-w-md glass-effect border-red-500/50">
@@ -256,7 +289,25 @@ const VideoPlayer = ({ shortUrlId, user, setCurrentView }) => { // Changed prop 
     );
   }
 
+  if (!fullyAuthenticated) { // Catch-all for any other unauthenticated state
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-space-pattern p-4">
+        <Card className="w-full max-w-md glass-effect border-red-500/50">
+          <CardHeader>
+            <CardTitle className="text-red-400 flex items-center"><EyeOff className="mr-2" /> Access Denied</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-red-200">You do not have the necessary permissions to view this video. Please check password or login status.</p>
+            <Button onClick={() => setCurrentView('home')} className="w-full mt-6 cyber-glow-red">
+              Go to Home
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
+  // If all checks pass, show video
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-space-pattern pt-20 p-4">
       <motion.div 

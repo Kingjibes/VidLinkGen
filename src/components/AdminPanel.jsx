@@ -11,7 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Label } from '@/components/ui/label'; // Added missing import
+import { Label } from '@/components/ui/label';
 
 const AdminPanel = ({ user: adminUser }) => {
   const [users, setUsers] = useState([]);
@@ -80,7 +80,10 @@ const AdminPanel = ({ user: adminUser }) => {
 
   const handleAssignOrUpdatePremium = async () => {
     if (!editingUser || !selectedPlanForModal) return;
-    const plan = Object.values(config.premiumPrices).find(p => p.tierName === selectedPlanForModal);
+    
+    const planKey = selectedPlanForModal; // This is now e.g., "individual_yearly"
+    const plan = config.premiumPrices[planKey];
+
     if (!plan) return toast({ title: "Error", description: "Invalid plan selected.", variant: "destructive" });
 
     const expiryDate = new Date();
@@ -95,15 +98,29 @@ const AdminPanel = ({ user: adminUser }) => {
     else {
       const { count } = await supabase.from('video_links').select('id', { count: 'exact', head: true }).eq('user_id', updatedProfile.id);
       setUsers(users.map(u => (u.id === editingUser.id ? { ...updatedProfile, link_count: count || 0 } : u)));
-      toast({ title: "Success", description: `${plan.label} assigned to ${updatedProfile.name}.` });
+      toast({ title: "Success", description: `${plan.label} assigned to ${updatedProfile.name}. Expires: ${expiryDate.toLocaleDateString()}` });
       closeEditModal();
     }
   };
 
   const handleExtendPremium = async () => {
     if (!editingUser?.premium_tier || !editingUser?.premium_expiry_date) return toast({ title: "Error", description: "No active plan to extend.", variant: "destructive" });
-    const plan = Object.values(config.premiumPrices).find(p => p.tierName === editingUser.premium_tier);
-    if (!plan) return toast({ title: "Error", description: "User's current plan is invalid.", variant: "destructive" });
+    
+    // Find the plan key that matches the user's current tier for extension.
+    // This assumes the user's premium_tier matches one of the main tierNames (individual, team).
+    // We need to decide if extension defaults to monthly or yearly. Let's assume monthly for now.
+    let planToExtendKey = Object.keys(config.premiumPrices).find(key => config.premiumPrices[key].tierName === editingUser.premium_tier && key.includes('_monthly'));
+    
+    // If no monthly key found (e.g., tier is just "legacy_premium" or something custom), try finding a yearly one
+    if(!planToExtendKey){
+        planToExtendKey = Object.keys(config.premiumPrices).find(key => config.premiumPrices[key].tierName === editingUser.premium_tier && key.includes('_yearly'));
+    }
+    // If still not found, or if you want to allow extending with any plan of the same tier, this logic might need to be more flexible
+    // For now, if no specific key found, we can't reliably get durationMonths.
+    if (!planToExtendKey) return toast({ title: "Error", description: "User's current plan configuration for extension not found.", variant: "destructive" });
+
+    const plan = config.premiumPrices[planToExtendKey];
+    if (!plan) return toast({ title: "Error", description: "User's current plan configuration is invalid.", variant: "destructive" });
     
     const newExpiryDate = new Date(editingUser.premium_expiry_date);
     newExpiryDate.setMonth(newExpiryDate.getMonth() + plan.durationMonths);
@@ -116,7 +133,7 @@ const AdminPanel = ({ user: adminUser }) => {
     else {
       const { count } = await supabase.from('video_links').select('id', { count: 'exact', head: true }).eq('user_id', updatedProfile.id);
       setUsers(users.map(u => (u.id === editingUser.id ? { ...updatedProfile, link_count: count || 0 } : u)));
-      toast({ title: "Success", description: `Subscription for ${updatedProfile.name} extended.` });
+      toast({ title: "Success", description: `Subscription for ${updatedProfile.name} extended. New Expiry: ${newExpiryDate.toLocaleDateString()}` });
       closeEditModal();
     }
   };
@@ -138,7 +155,7 @@ const AdminPanel = ({ user: adminUser }) => {
 
   const handleUpdateTicketStatus = async () => {
     if (!editingTicket || !selectedTicketStatus) return;
-    const { data, error } = await supabase
+    const { data: updatedTicket, error } = await supabase
       .from('support_tickets')
       .update({ status: selectedTicketStatus })
       .eq('id', editingTicket.id)
@@ -148,7 +165,7 @@ const AdminPanel = ({ user: adminUser }) => {
     if (error) {
       toast({ title: "Update Failed", description: error.message, variant: "destructive" });
     } else {
-      setSupportTickets(supportTickets.map(t => t.id === editingTicket.id ? data : t));
+      setSupportTickets(prevTickets => prevTickets.map(t => t.id === editingTicket.id ? updatedTicket : t));
       toast({ title: "Success", description: `Ticket status updated to ${selectedTicketStatus}.` });
       closeTicketModal();
     }
@@ -172,7 +189,7 @@ const AdminPanel = ({ user: adminUser }) => {
       case 'open': return <Badge className="bg-green-500/20 text-green-300 border-green-500/50">Open</Badge>;
       case 'in progress': return <Badge className="bg-blue-500/20 text-blue-300 border-blue-500/50">In Progress</Badge>;
       case 'resolved': return <Badge className="bg-purple-500/20 text-purple-300 border-purple-500/50">Resolved</Badge>;
-      case 'closed': return <Badge variant="secondary">Closed</Badge>;
+      case 'closed': return <Badge variant="secondary" className="bg-gray-500/20 text-gray-300 border-gray-500/50">Closed</Badge>;
       default: return <Badge variant="outline">{status}</Badge>;
     }
   };
@@ -227,8 +244,9 @@ const AdminPanel = ({ user: adminUser }) => {
                             {u.role === 'admin' && <Shield className="h-4 w-4 text-blue-400 ml-2 shrink-0" title="Admin User" />}
                           </p>
                           {u.is_premium ? (
-                            <Badge className="bg-yellow-500/20 text-yellow-300 border-yellow-500/50 text-xs">
-                              <Crown className="h-3 w-3 mr-1" /> {config.premiumPrices[u.premium_tier]?.label || u.premium_tier?.replace('_', ' ') || 'Premium'}
+                             <Badge className="bg-yellow-500/20 text-yellow-300 border-yellow-500/50 text-xs">
+                              <Crown className="h-3 w-3 mr-1" />
+                              {Object.values(config.premiumPrices).find(p => p.tierName === u.premium_tier)?.label.split(' ')[0] || u.premium_tier?.replace('_', ' ') || 'Premium'}
                             </Badge>
                           ) : <Badge variant="outline" className="text-xs">Free User</Badge>}
                         </div>
@@ -295,13 +313,13 @@ const AdminPanel = ({ user: adminUser }) => {
               <div className="space-y-2">
                 <label className="block text-sm font-medium text-muted-foreground mb-1">Select Plan to Assign/Update:</label>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  {Object.values(config.premiumPrices).map(plan => (
-                    <Button key={plan.tierName} variant="outline"
-                      className={cn("flex flex-col items-start p-3 h-auto text-left transition-all duration-200 border-white/20 hover:border-yellow-500/50", selectedPlanForModal === plan.tierName && "border-yellow-500 ring-2 ring-yellow-500 bg-yellow-500/10")}
-                      onClick={() => setSelectedPlanForModal(plan.tierName)} disabled={editingUser.role === 'admin'}>
+                  {Object.entries(config.premiumPrices).map(([planKey, plan]) => (
+                    <Button key={planKey} variant="outline"
+                      className={cn("flex flex-col items-start p-3 h-auto text-left transition-all duration-200 border-white/20 hover:border-yellow-500/50", selectedPlanForModal === planKey && "border-yellow-500 ring-2 ring-yellow-500 bg-yellow-500/10")}
+                      onClick={() => setSelectedPlanForModal(planKey)} disabled={editingUser.role === 'admin'}>
                       <div className="flex justify-between w-full items-center">
                         <span className="font-semibold text-sm">{plan.label}</span>
-                        {selectedPlanForModal === plan.tierName && <CheckCircle className="h-4 w-4 text-yellow-500" />}
+                        {selectedPlanForModal === planKey && <CheckCircle className="h-4 w-4 text-yellow-500" />}
                       </div>
                       <span className="text-xs text-muted-foreground">{plan.display} - {plan.durationMonths} month(s)</span>
                     </Button>
@@ -313,7 +331,7 @@ const AdminPanel = ({ user: adminUser }) => {
               </Button>
               {editingUser.is_premium && editingUser.premium_tier && editingUser.premium_expiry_date && (
                 <Button onClick={handleExtendPremium} variant="outline" className="w-full text-sm border-blue-500/50 text-blue-400 hover:bg-blue-500/10 hover:text-blue-300" disabled={editingUser.role === 'admin'}>
-                  <CalendarCheck className="h-4 w-4 mr-2" /> Extend Current Plan ({config.premiumPrices[editingUser.premium_tier]?.label || editingUser.premium_tier})
+                  <CalendarCheck className="h-4 w-4 mr-2" /> Extend Current Plan ({Object.values(config.premiumPrices).find(p=>p.tierName === editingUser.premium_tier)?.label.split(' ')[0] || editingUser.premium_tier})
                 </Button>
               )}
             </div>

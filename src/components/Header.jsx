@@ -1,90 +1,192 @@
+
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
+import { LogIn, LogOut, UserCircle, Crown, Menu, X, Shield, MessageSquare, Home, Tv2, Info, LayoutDashboard } from 'lucide-react';
+import config from '@/config';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu.jsx";
 import { supabase } from '@/lib/supabase';
-import { Shield, Video, Menu, X, Crown, UserCog, BarChart3 } from 'lucide-react';
+import { useToast } from "@/components/ui/use-toast";
 
-const Header = ({ user, setUser, currentView, setCurrentView, triggerPremiumModal }) => {
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
+const Header = ({ user, setUser, currentView, setCurrentView, triggerPremiumModal, triggerSupportModal }) => {
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const { toast } = useToast();
 
   const handleLogout = async () => {
     const { error } = await supabase.auth.signOut();
-    setUser(null);
-    setCurrentView('home');
     if (error) {
-      console.error("Logout Failed:", error.message);
+      toast({ title: "Logout Error", description: error.message, variant: "destructive" });
+    } else {
+      setUser(null);
+      setCurrentView('home');
+      toast({ title: "Logged Out", description: "You have been successfully logged out.", variant: "default" });
     }
-    setIsMenuOpen(false);
+    setIsMobileMenuOpen(false);
   };
-  
-  const handleNavClick = (view, params = null) => {
-    setCurrentView(view, params);
-    setIsMenuOpen(false);
-  }
+
+  const navItems = [
+    { name: 'Home', view: 'home', icon: Home },
+    { name: 'Generator', view: 'home', icon: Tv2, section: 'video-generator-section' },
+    { name: 'Features', view: 'features', icon: Info },
+  ];
+
+  const handleNavClick = (view, section) => {
+    setCurrentView(view);
+    if (section && view === 'home') {
+      setTimeout(() => { 
+        const el = document.getElementById(section);
+        if (el) el.scrollIntoView({ behavior: 'smooth' });
+      }, 100);
+    }
+    setIsMobileMenuOpen(false);
+  };
 
   return (
-    <motion.header initial={{ y: -100 }} animate={{ y: 0 }} className="fixed top-0 left-0 right-0 z-50 glass-effect border-b border-white/10">
-      <div className="container mx-auto px-4 py-3 md:py-4">
-        <div className="flex items-center justify-between">
-          <motion.div className="flex items-center space-x-2 md:space-x-3 cursor-pointer" onClick={() => handleNavClick('home')} whileHover={{ scale: 1.05 }}>
-            <div className="relative"><Video className="h-7 w-7 md:h-8 md:w-8 text-blue-500" /><Shield className="h-3 w-3 md:h-4 md:w-4 text-red-500 absolute -top-1 -right-1" /></div>
-            <div><h1 className="text-lg md:text-xl font-orbitron font-bold text-gradient">VidLinkGen</h1><p className="text-xs text-muted-foreground">Powered by CIPHERTECH</p></div>
-          </motion.div>
-          <nav className="hidden md:flex items-center space-x-4 lg:space-x-6">
-            <Button variant={currentView === 'home' ? 'default' : 'ghost'} onClick={() => handleNavClick('home')} className="font-medium text-sm lg:text-base">Home</Button>
-            {user && <Button variant={currentView === 'dashboard' ? 'default' : 'ghost'} onClick={() => handleNavClick('dashboard')} className="font-medium text-sm lg:text-base">Dashboard</Button>}
-            <Button variant={currentView === 'features' ? 'default' : 'ghost'} onClick={() => handleNavClick('features')} className="font-medium text-sm lg:text-base">Features</Button>
-            {user?.role === 'admin' && <Button variant={currentView === 'admin' ? 'default' : 'ghost'} onClick={() => handleNavClick('admin')} className="font-medium flex items-center text-sm lg:text-base"><UserCog className="h-4 w-4 mr-1 lg:mr-2" />Admin</Button>}
-          </nav>
-          <div className="hidden md:flex items-center space-x-3 lg:space-x-4">
-            {user ? (
-              <div className="flex items-center space-x-3 lg:space-x-4">
-                 {!user.is_premium && (
-                  <Button 
-                    onClick={() => setCurrentView('features')} 
-                    size="sm" 
-                    className="bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 text-black font-semibold text-xs lg:text-sm"
-                  >
-                    <Crown className="h-3 w-3 lg:h-4 lg:w-4 mr-1 lg:mr-2" /> Upgrade
-                  </Button>
-                )}
-                <div className="flex items-center space-x-1 lg:space-x-2"><span className="text-xs lg:text-sm font-medium truncate max-w-[100px] lg:max-w-[150px]">{user.name}</span>{user.is_premium && <Crown className="h-3 w-3 lg:h-4 lg:w-4 text-yellow-500" />}</div>
-                <Button variant="outline" onClick={handleLogout} size="sm" className="text-xs lg:text-sm">Logout</Button>
-              </div>
-            ) : (
-              <Button className="cyber-glow text-xs lg:text-sm px-3 py-1.5 lg:px-4 lg:py-2" onClick={() => handleNavClick('auth')}>Get Started</Button>
-            )}
-          </div>
-          <Button variant="ghost" size="icon" className="md:hidden" onClick={() => setIsMenuOpen(!isMenuOpen)}>{isMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}</Button>
+    <motion.header
+      initial={{ y: -100, opacity: 0 }}
+      animate={{ y: 0, opacity: 1 }}
+      transition={{ type: 'spring', stiffness: 50, delay: 0.2 }}
+      className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-md shadow-lg border-b border-white/10"
+    >
+      <div className="container mx-auto px-4 py-3 flex justify-between items-center">
+        <div
+          onClick={() => handleNavClick('home')}
+          className="text-2xl font-orbitron font-bold text-gradient cursor-pointer"
+        >
+          {config.siteName}
         </div>
-        {isMenuOpen && (
-          <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="md:hidden mt-4 space-y-3 border-t border-white/10 pt-4">
-            <Button variant={currentView === 'home' ? 'default' : 'ghost'} onClick={() => handleNavClick('home')} className="w-full justify-start text-base py-3">Home</Button>
-            {user && <Button variant={currentView === 'dashboard' ? 'default' : 'ghost'} onClick={() => handleNavClick('dashboard')} className="w-full justify-start text-base py-3">Dashboard</Button>}
-            <Button variant={currentView === 'features' ? 'default' : 'ghost'} onClick={() => handleNavClick('features')} className="w-full justify-start text-base py-3">Features</Button>
-            {user?.role === 'admin' && <Button variant={currentView === 'admin' ? 'default' : 'ghost'} onClick={() => handleNavClick('admin')} className="w-full justify-start flex items-center text-base py-3"><UserCog className="h-5 w-5 mr-2"/>Admin Panel</Button>}
-            {user ? (
-              <div className="space-y-3 pt-2 border-t border-white/10">
-                {!user.is_premium && (
-                  <Button 
-                    onClick={() => { setIsMenuOpen(false); setCurrentView('features');}} 
-                    className="w-full justify-center bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 text-black font-semibold text-base py-3"
-                  >
-                    <Crown className="h-5 w-5 mr-2" /> Upgrade to Premium
-                  </Button>
+
+        <nav className="hidden md:flex items-center space-x-2">
+          {navItems.map((item) => (
+            <Button
+              key={item.name}
+              variant={currentView === item.view && !item.section ? "secondary" : "ghost"}
+              onClick={() => handleNavClick(item.view, item.section)}
+              className="font-semibold text-sm hover:text-blue-400 transition-colors"
+            >
+              <item.icon className="mr-2 h-4 w-4" /> {item.name}
+            </Button>
+          ))}
+          {user && user.is_premium && (
+             <Button variant="ghost" onClick={triggerSupportModal} className="font-semibold text-sm hover:text-blue-400 transition-colors">
+                <MessageSquare className="mr-2 h-4 w-4" /> Support
+            </Button>
+          )}
+        </nav>
+
+        <div className="flex items-center space-x-3">
+          {user ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" className="rounded-full p-0 h-9 w-9 md:h-10 md:w-10 hover:bg-primary/10 focus-visible:ring-1 focus-visible:ring-primary">
+                   {user.is_premium && <Crown className="absolute top-0 right-0 h-3 w-3 text-yellow-500 transform translate-x-1/4 -translate-y-1/4" />}
+                  <UserCircle className="h-6 w-6 md:h-7 md:w-7 text-foreground" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="glass-effect border-white/20 w-56">
+                <DropdownMenuLabel className="font-normal">
+                  <div className="flex flex-col space-y-1">
+                    <p className="text-sm font-medium leading-none truncate">{user.user_metadata?.name || user.email}</p>
+                    <p className="text-xs leading-none text-muted-foreground truncate">{user.email}</p>
+                  </div>
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => handleNavClick('dashboard')} className="cursor-pointer">
+                  <LayoutDashboard className="mr-2 h-4 w-4" />
+                  <span>Dashboard</span>
+                </DropdownMenuItem>
+                {user.is_premium ? (
+                  <>
+                    <DropdownMenuItem onClick={triggerSupportModal} className="cursor-pointer">
+                      <MessageSquare className="mr-2 h-4 w-4" />
+                      <span>Support</span>
+                    </DropdownMenuItem>
+                     <DropdownMenuItem disabled className="cursor-not-allowed opacity-70">
+                      <Crown className="mr-2 h-4 w-4 text-yellow-500" />
+                      <span className="text-yellow-400">Premium User</span>
+                    </DropdownMenuItem>
+                  </>
+                ) : (
+                  <DropdownMenuItem onClick={() => triggerPremiumModal("Premium Features")} className="cursor-pointer text-yellow-500 hover:!text-yellow-400">
+                    <Crown className="mr-2 h-4 w-4" />
+                    <span>Upgrade to Premium</span>
+                  </DropdownMenuItem>
                 )}
-                <div className="flex items-center space-x-2 px-3 py-2">
-                  <span className="text-sm font-medium truncate">{user.name}</span>
-                  {user.is_premium && <Crown className="h-4 w-4 text-yellow-500" />}
-                </div>
-                <Button variant="outline" onClick={handleLogout} className="w-full text-base py-3">Logout</Button>
-              </div>
-            ) : (
-              <Button className="w-full cyber-glow text-base py-3" onClick={() => handleNavClick('auth')}>Get Started</Button>
-            )}
-          </motion.div>
-        )}
+                {user.role === 'admin' && (
+                  <DropdownMenuItem onClick={() => handleNavClick('admin')} className="cursor-pointer">
+                    <Shield className="mr-2 h-4 w-4" />
+                    <span>Admin Panel</span>
+                  </DropdownMenuItem>
+                )}
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={handleLogout} className="cursor-pointer text-red-500 hover:!text-red-400">
+                  <LogOut className="mr-2 h-4 w-4" />
+                  <span>Log out</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : (
+            <Button
+              onClick={() => handleNavClick('auth')}
+              className="cyber-button text-sm"
+              size="sm"
+            >
+              <LogIn className="mr-2 h-4 w-4" /> Login / Register
+            </Button>
+          )}
+
+          <Button
+            variant="ghost"
+            size="icon"
+            className="md:hidden hover:bg-primary/10"
+            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+          >
+            {isMobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+          </Button>
+        </div>
       </div>
+
+      {isMobileMenuOpen && (
+        <motion.div
+          initial={{ opacity: 0, height: 0 }}
+          animate={{ opacity: 1, height: 'auto' }}
+          exit={{ opacity: 0, height: 0 }}
+          className="md:hidden bg-background/90 backdrop-blur-lg border-t border-white/10"
+        >
+          <nav className="flex flex-col px-4 py-3 space-y-1">
+            {navItems.map((item) => (
+              <Button
+                key={item.name}
+                variant={currentView === item.view && !item.section ? "secondary" : "ghost"}
+                onClick={() => handleNavClick(item.view, item.section)}
+                className="justify-start font-semibold hover:text-blue-400 transition-colors"
+              >
+                <item.icon className="mr-2 h-4 w-4" /> {item.name}
+              </Button>
+            ))}
+            {user && user.is_premium && (
+                <Button variant="ghost" onClick={triggerSupportModal} className="justify-start font-semibold hover:text-blue-400 transition-colors">
+                    <MessageSquare className="mr-2 h-4 w-4" /> Support
+                </Button>
+            )}
+            {!user && (
+               <Button
+                onClick={() => handleNavClick('auth')}
+                className="cyber-button w-full justify-center mt-2"
+              >
+                <LogIn className="mr-2 h-4 w-4" /> Login / Register
+              </Button>
+            )}
+          </nav>
+        </motion.div>
+      )}
     </motion.header>
   );
 };

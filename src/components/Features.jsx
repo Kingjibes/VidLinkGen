@@ -1,9 +1,10 @@
+
 import React from 'react';
 import { motion } from 'framer-motion';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { 
   Shield, 
   Lock, 
@@ -31,8 +32,10 @@ import config from '@/config';
 
 const PaymentDialog = ({setCurrentView, selectedPlan}) => {
   const { momoNumber, telegramHandles, whatsappNumbers } = config.contact;
-  const planDetails = selectedPlan ? Object.values(config.premiumPrices).find(p => p.tierName === selectedPlan) : null;
-  const priceToDisplay = planDetails ? planDetails.display : config.defaultPremiumPriceDisplay;
+  
+  const planKey = selectedPlan;
+  const planDetails = config.premiumPrices[planKey] || null;
+  const priceToDisplay = planDetails ? planDetails.display : "Premium";
 
 
   const copyToClipboard = (text) => {
@@ -83,24 +86,29 @@ const PaymentDialog = ({setCurrentView, selectedPlan}) => {
         </div>
       </div>
        <DialogFooter>
-        <Button variant="outline" onClick={() => {
-            const dialogTrigger = document.querySelector('[aria-controls^="radix-"][aria-expanded="true"]');
-            if (dialogTrigger) dialogTrigger.click();
-          }}>
-          Close
-        </Button>
+        <DialogClose asChild>
+          <Button variant="outline">Close</Button>
+        </DialogClose>
       </DialogFooter>
     </DialogContent>
   );
 }
 
-const Features = ({user, setCurrentView, triggerSupportModal}) => {
+const Features = ({user, setCurrentView, triggerSupportModal, triggerPremiumModal}) => {
   const [selectedPlanForPayment, setSelectedPlanForPayment] = React.useState(null);
+  const [isPaymentDialogOpen, setIsPaymentDialogOpen] = React.useState(false);
+
 
   const freeFeatures = [
-    { icon: Video, title: "Video Upload (500MB)", description: "Upload videos up to 500MB directly to our secure servers.", color: "text-blue-500" },
+    { icon: Video, title: "Video Upload (200MB)", description: "Upload videos up to 200MB directly to our secure servers.", color: "text-blue-500" },
     { icon: Globe, title: "URL Linking", description: "Generate secure links from YouTube, Vimeo, and more.", color: "text-green-500" },
-    { icon: Lock, title: "Password Protection", description: "Add password protection to your video links (Upgrade to Premium to activate).", color: "text-red-500" },
+    { 
+      icon: Lock, 
+      title: "Password Protection", 
+      description: user?.is_premium ? "Add password protection to your video links." : "Add password protection to your video links (Upgrade to Premium to activate).", 
+      color: user?.is_premium ? "text-green-500" : "text-red-500",
+      action: !user?.is_premium ? () => triggerPremiumModal("Password Protection") : null
+    },
     { icon: Calendar, title: "Expiry Dates", description: "Set automatic expiration dates for your shared links.", color: "text-purple-500" },
     { icon: BarChart3, title: "Basic Analytics", description: "Track views and basic engagement metrics for your links.", color: "text-yellow-500" },
     { icon: Smartphone, title: "Mobile Responsive", description: "Access and manage your links from any device, anywhere.", color: "text-cyan-500" }
@@ -111,16 +119,11 @@ const Features = ({user, setCurrentView, triggerSupportModal}) => {
       id: 'individual',
       name: 'Individual Plan',
       icon: User,
-      monthlyPrice: config.premiumPrices.individualMonthly.display,
-      yearlyPrice: config.premiumPrices.individualYearly.display,
-      monthlyTierName: config.premiumPrices.individualMonthly.tierName,
-      yearlyTierName: config.premiumPrices.individualYearly.tierName,
-      features: [
-        { icon: Cloud, title: "100GB Upload Limit", description: "Upload larger videos up to 100GB.", color: "text-blue-500" },
-        { icon: Shield, title: "File Encryption", description: "Secure your video files with robust encryption.", color: "text-red-500" },
-        { icon: Users, title: "Advanced Access Control", description: "Grant specific users access to your private links.", color: "text-green-500" },
-        { icon: BarChart3, title: "Advanced Analytics", description: "Detailed analytics with geographic data and user insights.", color: "text-purple-500" },
-      ],
+      monthlyPrice: config.premiumPrices.individual_monthly.display,
+      yearlyPrice: config.premiumPrices.individual_yearly.display,
+      monthlyPlanKey: 'individual_monthly',
+      yearlyPlanKey: 'individual_yearly',
+      features: config.premiumPrices.individual_monthly.features.map(f => ({ title: f, description: f, icon: Cloud, color: "text-blue-500"})), // Simplified for example
       color: "border-teal-500/50 hover:border-teal-500/70",
       gradient: "from-teal-500/20 to-transparent"
     },
@@ -128,25 +131,24 @@ const Features = ({user, setCurrentView, triggerSupportModal}) => {
       id: 'team',
       name: 'Team Plan',
       icon: Users2,
-      monthlyPrice: config.premiumPrices.teamMonthly.display,
-      yearlyPrice: config.premiumPrices.teamYearly.display,
-      monthlyTierName: config.premiumPrices.teamMonthly.tierName,
-      yearlyTierName: config.premiumPrices.teamYearly.tierName,
-      features: [
-        { icon: Cloud, title: "2TB Upload Limit", description: "Massive 2TB storage for all your team's videos.", color: "text-blue-500" },
-        { icon: Shield, title: "File Encryption", description: "Secure your video files with robust encryption.", color: "text-red-500" },
-        { icon: Users, title: "Advanced Access Control", description: "Grant specific users access to your private links.", color: "text-green-500" },
-        { icon: BarChart3, title: "Advanced Analytics", description: "Detailed analytics with geographic data and user insights.", color: "text-purple-500" },
-        { icon: Download, title: "Bulk Operations", description: "Batch upload, download, and manage multiple videos.", color: "text-yellow-500" },
-      ],
+      monthlyPrice: config.premiumPrices.team_monthly.display,
+      yearlyPrice: config.premiumPrices.team_yearly.display,
+      monthlyPlanKey: 'team_monthly',
+      yearlyPlanKey: 'team_yearly',
+      features: config.premiumPrices.team_monthly.features.map(f => ({ title: f, description: f, icon: Cloud, color: "text-blue-500"})), // Simplified for example
       color: "border-indigo-500/50 hover:border-indigo-500/70",
       gradient: "from-indigo-500/20 to-transparent"
     }
   ];
   
   const commonPremiumFeatures = [
-     { icon: LifeBuoy, title: "Priority Support", description: "24/7 premium support with faster response times.", color: "text-cyan-500", id: "priority_support", isImplemented: true, action: triggerSupportModal }
+     { icon: LifeBuoy, title: "24/7 Priority Support", description: "Get faster help with our dedicated support team.", color: "text-cyan-500", action: triggerSupportModal }
   ];
+
+  const handleChoosePlan = (planKey) => {
+    setSelectedPlanForPayment(planKey);
+    setIsPaymentDialogOpen(true);
+  };
 
 
   return (
@@ -164,7 +166,15 @@ const Features = ({user, setCurrentView, triggerSupportModal}) => {
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
             {freeFeatures.map((feature, index) => (
-              <motion.div key={index} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 * index }} whileHover={{ scale: 1.05 }}>
+              <motion.div 
+                key={index} 
+                initial={{ opacity: 0, y: 20 }} 
+                animate={{ opacity: 1, y: 0 }} 
+                transition={{ delay: 0.1 * index }} 
+                whileHover={{ scale: 1.05 }}
+                onClick={feature.action}
+                className={feature.action ? "cursor-pointer" : ""}
+              >
                 <Card className="glass-effect border-white/20 h-full hover:border-blue-500/30 transition-all duration-300">
                   <CardHeader><CardTitle className="flex items-center space-x-3 text-lg md:text-xl"><feature.icon className={`h-5 w-5 md:h-6 md:w-6 ${feature.color}`} /><span>{feature.title}</span></CardTitle></CardHeader>
                   <CardContent><p className="text-muted-foreground text-sm md:text-base">{feature.description}</p></CardContent>
@@ -174,7 +184,7 @@ const Features = ({user, setCurrentView, triggerSupportModal}) => {
           </div>
         </motion.div>
 
-        <Dialog onOpenChange={(open) => !open && setSelectedPlanForPayment(null)}>
+        <Dialog open={isPaymentDialogOpen} onOpenChange={setIsPaymentDialogOpen}>
           <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }} className="mb-12 md:mb-16">
             <div className="text-center mb-6 md:mb-8">
               <div className="flex items-center justify-center space-x-2 mb-3 md:mb-4">
@@ -203,25 +213,31 @@ const Features = ({user, setCurrentView, triggerSupportModal}) => {
                     </CardHeader>
                     <CardContent className="flex-grow">
                       <ul className="space-y-2 mb-6">
-                        {tier.features.map((feature, idx) => (
-                          <li key={idx} className="flex items-start space-x-2">
-                            <feature.icon className={`h-4 w-4 mt-1 flex-shrink-0 ${feature.color}`} />
-                            <span className="text-sm text-muted-foreground">{feature.description}</span>
-                          </li>
-                        ))}
-                         {commonPremiumFeatures.map((feature, idx) => (
-                          <li key={`common-${idx}`} className="flex items-start space-x-2">
-                            <feature.icon className={`h-4 w-4 mt-1 flex-shrink-0 ${feature.color}`} />
-                            <span className="text-sm text-muted-foreground">{feature.description}</span>
-                          </li>
-                        ))}
+                        {config.premiumPrices[tier.monthlyPlanKey].features.map((featureDesc, idx) => {
+                           let IconComponent = Cloud; // Default icon
+                           if (featureDesc.toLowerCase().includes("upload limit")) IconComponent = Cloud;
+                           else if (featureDesc.toLowerCase().includes("encryption")) IconComponent = Shield;
+                           else if (featureDesc.toLowerCase().includes("access control")) IconComponent = Users;
+                           else if (featureDesc.toLowerCase().includes("analytics")) IconComponent = BarChart3;
+                           else if (featureDesc.toLowerCase().includes("collaboration")) IconComponent = Users2;
+                           else if (featureDesc.toLowerCase().includes("bulk operations")) IconComponent = Download;
+                           else if (featureDesc.toLowerCase().includes("priority support")) IconComponent = LifeBuoy;
+
+
+                          return (
+                            <li key={idx} className="flex items-start space-x-2">
+                              <IconComponent className={`h-4 w-4 mt-1 flex-shrink-0 text-green-400`} />
+                              <span className="text-sm text-muted-foreground">{featureDesc}</span>
+                            </li>
+                          );
+                        })}
                       </ul>
                     </CardContent>
                     <div className="p-6 pt-0 mt-auto">
                       <div className="flex flex-col sm:flex-row gap-2">
                         <DialogTrigger asChild>
                           <Button 
-                            onClick={() => setSelectedPlanForPayment(tier.monthlyTierName)}
+                            onClick={() => handleChoosePlan(tier.monthlyPlanKey)}
                             className="w-full bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 text-black font-semibold"
                           >
                             Choose Monthly
@@ -229,11 +245,11 @@ const Features = ({user, setCurrentView, triggerSupportModal}) => {
                         </DialogTrigger>
                         <DialogTrigger asChild>
                           <Button 
-                            onClick={() => setSelectedPlanForPayment(tier.yearlyTierName)}
+                            onClick={() => handleChoosePlan(tier.yearlyPlanKey)}
                             variant="outline" 
                             className="w-full border-yellow-500/50 text-yellow-400 hover:bg-yellow-500/10 hover:text-yellow-300"
                           >
-                            Choose Yearly (Save 16%)
+                            Choose Yearly (Save ~16%)
                           </Button>
                         </DialogTrigger>
                       </div>
@@ -242,7 +258,7 @@ const Features = ({user, setCurrentView, triggerSupportModal}) => {
                 </motion.div>
               ))}
             </div>
-            <PaymentDialog setCurrentView={setCurrentView} selectedPlan={selectedPlanForPayment} />
+            {isPaymentDialogOpen && <PaymentDialog setCurrentView={setCurrentView} selectedPlan={selectedPlanForPayment} />}
           </motion.div>
         </Dialog>
 
