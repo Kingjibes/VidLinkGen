@@ -1,7 +1,7 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge'; // Added missing import
+import { Badge } from '@/components/ui/badge';
 import { Shield, UploadCloud, Zap, Lock, ArrowRight, Crown, PlayCircle } from 'lucide-react';
 import config from '@/config';
 
@@ -14,16 +14,34 @@ const Hero = ({ setCurrentView, user }) => {
   ];
 
   const scrollToGenerator = () => {
+    // First try to scroll immediately
     const generatorSection = document.getElementById('video-generator-section');
+    
     if (generatorSection) {
-      generatorSection.scrollIntoView({ behavior: 'smooth' });
-    } else {
-      setCurrentView('home'); 
-      setTimeout(() => {
-         const el = document.getElementById('video-generator-section');
-         if (el) el.scrollIntoView({ behavior: 'smooth' });
-      }, 100);
+      generatorSection.scrollIntoView({ 
+        behavior: 'smooth', 
+        block: 'start' 
+      });
+      return;
     }
+
+    // If element not found, switch to home view
+    setCurrentView('home');
+    
+    // Try again after view updates
+    const retryInterval = setInterval(() => {
+      const el = document.getElementById('video-generator-section');
+      if (el) {
+        clearInterval(retryInterval);
+        el.scrollIntoView({ 
+          behavior: 'smooth', 
+          block: 'start' 
+        });
+      }
+    }, 100); // Check every 100ms
+    
+    // Give up after 2 seconds if element still not found
+    setTimeout(() => clearInterval(retryInterval), 2000);
   };
 
   return (
@@ -102,7 +120,6 @@ const Hero = ({ setCurrentView, user }) => {
                 Explore Premium Plans
             </Button>
         </motion.div>
-
       </div>
     </section>
   );
