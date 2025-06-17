@@ -1,30 +1,74 @@
 const config = {
+  siteName: "VidLinkGen",
   contact: {
+    email: "support@vidlinkgen.com",
+    twitter: "@vidlinkgen",
     whatsappNumbers: [
-      { id: 'whatsapp1', number: '+233557488116', channelUrl: 'https://whatsapp.com/channel/0029VaN2eQQ59PwNixDnvD16/7593' },
-      { id: 'whatsapp2', number: '+233550000000', channelUrl: 'https://whatsapp.com/channel/YOUR_NEW_CHANNEL_ID_2' }, 
+      { id: 'whatsapp1', number: '+15551234567', channelUrl: 'https://whatsapp.com/channel/YOUR_CHANNEL_URL_1' },
+      { id: 'whatsapp2', number: '+15557654321', channelUrl: 'https://whatsapp.com/channel/YOUR_CHANNEL_URL_2' },
     ],
     telegramHandles: [
-      { id: 'telegram1', username: 'HACK_ERPRO', link: 'https://t.me/HACK_ERPRO' },
-      { id: 'telegram2', username: 'YOUR_NEW_TELEGRAM_USERNAME', link: 'https://t.me/YOUR_NEW_TELEGRAM_USERNAME' },
+      { id: 'telegram1', username: 'vidlinkgen_support', link: 'https://t.me/vidlinkgen_support' },
+      { id: 'telegram2', username: 'vidlinkgen_sales', link: 'https://t.me/vidlinkgen_sales' },
     ],
-    momoNumber: '0557488116',
+    momoNumber: "024XXXXXXX",
   },
   premiumPrices: {
-    individualMonthly: { amount: 2, display: '$2', durationMonths: 1, tierName: 'individual_monthly', label: 'Individual Monthly' },
-    individualYearly: { amount: 20, display: '$20', durationMonths: 12, tierName: 'individual_yearly', label: 'Individual Yearly' },
-    teamMonthly: { amount: 5, display: '$5', durationMonths: 1, tierName: 'team_monthly', label: 'Team Monthly' },
-    teamYearly: { amount: 50, display: '$50', durationMonths: 12, tierName: 'team_yearly', label: 'Team Yearly' },
+    individual_monthly: {
+      tierName: "individual",
+      label: "Individual Monthly",
+      price: "$2",
+      display: "$2/month",
+      durationMonths: 1,
+      uploadLimit: 100 * 1024 * 1024 * 1024, // 100GB
+      features: ["100GB Upload Limit", "Password Protection", "File Encryption", "Advanced Access Control", "No Ads", "Detailed Analytics", "24/7 Priority Support"]
+    },
+    individual_yearly: {
+      tierName: "individual",
+      label: "Individual Yearly",
+      price: "$20",
+      display: "$20/year (Save $4)",
+      durationMonths: 12,
+      uploadLimit: 100 * 1024 * 1024 * 1024, // 100GB
+      features: ["100GB Upload Limit", "Password Protection", "File Encryption", "Advanced Access Control", "No Ads", "Detailed Analytics", "24/7 Priority Support"]
+    },
+    team_monthly: {
+      tierName: "team",
+      label: "Team Monthly",
+      price: "$5",
+      display: "$5/month",
+      durationMonths: 1,
+      uploadLimit: 2 * 1024 * 1024 * 1024 * 1024, // 2TB
+      features: ["2TB Upload Limit", "Team Collaboration Features", "Password Protection", "File Encryption", "Advanced Access Control", "No Ads", "Detailed Analytics", "24/7 Priority Support"]
+    },
+    team_yearly: {
+      tierName: "team",
+      label: "Team Yearly",
+      price: "$50",
+      display: "$50/year (Save $10)",
+      durationMonths: 12,
+      uploadLimit: 2 * 1024 * 1024 * 1024 * 1024, // 2TB
+      features: ["2TB Upload Limit", "Team Collaboration Features", "Password Protection", "File Encryption", "Advanced Access Control", "No Ads", "Detailed Analytics", "24/7 Priority Support"]
+    },
   },
   uploadLimits: {
-    free: 500 * 1024 * 1024, // 500MB
-    individual_monthly: 100 * 1024 * 1024 * 1024, // 100GB
-    individual_yearly: 100 * 1024 * 1024 * 1024, // 100GB
-    team_monthly: 2 * 1024 * 1024 * 1024 * 1024, // 2TB
-    team_yearly: 2 * 1024 * 1024 * 1024 * 1024, // 2TB
-    legacy_premium: 2 * 1024 * 1024 * 1024 * 1024, // Default for existing premium users, can be 2TB
+    free: 200 * 1024 * 1024, // 200MB
+    individual: 100 * 1024 * 1024 * 1024, // 100GB
+    team: 2 * 1024 * 1024 * 1024 * 1024, // 2TB
+    legacy_premium: 2 * 1024 * 1024 * 1024 * 1024, // 2TB for any premium user without a specific tier (fallback)
   },
-  defaultPremiumPriceDisplay: '$2', 
+  urlSchemes: ['http://', 'https://'],
+  defaultVideoName: "My VidLinkGen Video",
+  defaultLinkExpiryDays: 30,
+  qrCodeSettings: {
+    size: 128,
+    level: 'H', // Error correction level: L, M, Q, H
+    bgColor: "#FFFFFF",
+    fgColor: "#0F172A", // A dark color, e.g., your primary dark text color
+  },
+  supabaseBucketName: "videos",
+  maxCustomNameLength: 100,
+  maxDescriptionLength: 500,
 };
 
 export default config;

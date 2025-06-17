@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Toaster } from '@/components/ui/toaster';
 import Header from '@/components/Header';
@@ -23,8 +24,8 @@ function App() {
   const [viewParams, setViewParams] = useState(null);
   const [showWhatsappModal, setShowWhatsappModal] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
-  const [showPremiumModal, setShowPremiumModal] = useState(false);
-  const [premiumModalFeature, setPremiumModalFeature] = useState('');
+  const [showPremiumModal, setShowPremiumModal] = useState(false); // This can be kept for other potential uses or removed if truly unused.
+  const [premiumModalFeature, setPremiumModalFeature] = useState(''); // Same as above.
   const [showSupportModal, setShowSupportModal] = useState(false);
   const { toast } = useToast();
 
@@ -38,7 +39,6 @@ function App() {
         isActivePremium = false; 
       }
     } else if (profileData.is_premium && !profileData.premium_tier) {
-      //This case is for legacy premium users who don't have a tier or expiry date
       isActivePremium = true; 
     } else if (!profileData.is_premium) {
       isActivePremium = false;
@@ -57,11 +57,11 @@ function App() {
       if (path.startsWith('/v/')) {
         const shortUrlId = path.split('/v/')[1];
         if (shortUrlId) {
-          setViewParams({ shortUrlId }); // Pass shortUrlId to VideoPlayer
+          setViewParams({ shortUrlId }); 
           setCurrentView('videoPlayer');
         }
       } else if (path.startsWith('/analytics/')) {
-        const linkId = path.split('/analytics/')[1]; // This is the DB UUID
+        const linkId = path.split('/analytics/')[1]; 
         if (linkId) {
           setViewParams({ linkId });
           setCurrentView('detailedAnalytics');
@@ -71,6 +71,8 @@ function App() {
         setCurrentView(viewFromPath);
         if (editLinkIdFromQuery && viewFromPath === 'home') {
           setViewParams({ editLinkId: editLinkIdFromQuery });
+        } else if (viewFromPath === 'features') {
+           setViewParams(null); 
         } else {
           setViewParams(null);
         }
@@ -118,9 +120,9 @@ function App() {
     let path = `/${view === 'home' ? '' : view}`;
     let query = '';
 
-    if (view === 'videoPlayer' && params?.shortUrlId) { // Expect shortUrlId for navigation
+    if (view === 'videoPlayer' && params?.shortUrlId) { 
       path = `/v/${params.shortUrlId}`;
-    } else if (view === 'detailedAnalytics' && params?.linkId) { // Expect DB UUID
+    } else if (view === 'detailedAnalytics' && params?.linkId) { 
       path = `/analytics/${params.linkId}`;
     } else if (view === 'home' && params?.editLinkId) {
       query = `?edit=${params.editLinkId}`;
@@ -164,15 +166,27 @@ function App() {
   };
   
   const triggerAuthModal = () => setShowAuthModal(true);
-  const triggerPremiumModal = (featureName) => {
-    setPremiumModalFeature(featureName);
-    setShowPremiumModal(true);
+
+  const triggerPremiumRedirect = (featureName = "Premium Features") => {
+    if (!user) {
+      triggerAuthModal();
+    } else {
+      // If user is logged in, always redirect to features page when trying to upgrade
+      toast({
+        title: "Upgrade to Premium",
+        description: `Access to ${featureName} and more awaits! Check out our premium plans.`,
+        variant: "default",
+      });
+      changeView('features');
+    }
   };
+
   const triggerSupportModal = () => {
     if (user && user.is_premium) {
       setShowSupportModal(true);
     } else if (user && !user.is_premium) {
-      triggerPremiumModal("24/7 Priority Support");
+      // If not premium, redirect to features page instead of showing a modal for support
+      triggerPremiumRedirect("24/7 Priority Support");
     } else {
       triggerAuthModal();
     }
@@ -183,9 +197,9 @@ function App() {
     const editLinkIdForGenerator = currentView === 'home' ? viewParams?.editLinkId : null;
     switch (currentView) {
       case 'dashboard':
-        return user ? <Dashboard user={user} setCurrentView={changeView} triggerPremiumModal={triggerPremiumModal} /> : <Hero setCurrentView={changeView} user={user} />;
+        return user ? <Dashboard user={user} setCurrentView={changeView} triggerPremiumModal={triggerPremiumRedirect} /> : <Hero setCurrentView={changeView} user={user} />;
       case 'features':
-        return <Features user={user} setCurrentView={changeView} triggerSupportModal={triggerSupportModal} />;
+        return <Features user={user} setCurrentView={changeView} triggerSupportModal={triggerSupportModal} triggerPremiumModal={triggerPremiumRedirect} />;
       case 'admin':
         return user?.role === 'admin' ? <AdminPanel user={user} /> : <Hero setCurrentView={changeView} user={user} />;
       case 'auth':
@@ -203,7 +217,7 @@ function App() {
               user={user} 
               editLinkId={editLinkIdForGenerator} 
               triggerAuthModal={triggerAuthModal}
-              triggerPremiumModal={triggerPremiumModal}
+              triggerPremiumModal={triggerPremiumRedirect}
               setCurrentView={changeView}
             />
           </>
@@ -218,7 +232,8 @@ function App() {
         setUser={setUser} 
         currentView={currentView} 
         setCurrentView={changeView} 
-        triggerPremiumModal={() => triggerPremiumModal("Premium Features")}
+        triggerPremiumModal={triggerPremiumRedirect} // Use the direct redirect
+        triggerSupportModal={triggerSupportModal}
       />
       <main className="flex-grow">
         {renderCurrentView()}
@@ -244,6 +259,10 @@ function App() {
         </DialogContent>
       </Dialog>
 
+      {/* The Premium Modal is no longer directly triggered for simple upgrade prompts. 
+          It could be repurposed for specific feature-locked messages if needed, 
+          but for general "Upgrade" calls, we now redirect. 
+          Keeping it for now in case of other specific uses. */}
       <Dialog open={showPremiumModal} onOpenChange={setShowPremiumModal}>
         <DialogContent className="glass-effect border-yellow-500/30">
           <DialogHeader>
