@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
@@ -13,35 +14,24 @@ const Hero = ({ setCurrentView, user }) => {
     { icon: Zap, text: '99.9% Uptime', premium: false },
   ];
 
-  const scrollToGenerator = () => {
-    // First try to scroll immediately
-    const generatorSection = document.getElementById('video-generator-section');
-    
-    if (generatorSection) {
-      generatorSection.scrollIntoView({ 
-        behavior: 'smooth', 
-        block: 'start' 
-      });
-      return;
+  const handleGetStarted = () => {
+    if (user) {
+      // If user is logged in, scroll to video generator
+      setCurrentView('home');
+      setTimeout(() => {
+        const element = document.getElementById('video-generator-section');
+        if (element) {
+          element.scrollIntoView({ 
+            behavior: 'smooth',
+            block: 'start',
+            inline: 'nearest'
+          });
+        }
+      }, 100);
+    } else {
+      // If user is not logged in, redirect to auth page
+      setCurrentView('auth');
     }
-
-    // If element not found, switch to home view
-    setCurrentView('home');
-    
-    // Try again after view updates
-    const retryInterval = setInterval(() => {
-      const el = document.getElementById('video-generator-section');
-      if (el) {
-        clearInterval(retryInterval);
-        el.scrollIntoView({ 
-          behavior: 'smooth', 
-          block: 'start' 
-        });
-      }
-    }, 100); // Check every 100ms
-    
-    // Give up after 2 seconds if element still not found
-    setTimeout(() => clearInterval(retryInterval), 2000);
   };
 
   return (
@@ -68,9 +58,10 @@ const Hero = ({ setCurrentView, user }) => {
             <Button
               size="lg"
               className="w-full sm:w-auto text-base md:text-lg px-8 py-6 cyber-button group"
-              onClick={scrollToGenerator}
+              onClick={handleGetStarted}
             >
-              <PlayCircle className="mr-2 h-5 w-5 group-hover:animate-pulse" /> Get Started Now
+              <PlayCircle className="mr-2 h-5 w-5 group-hover:animate-pulse" /> 
+              {user ? 'Get Started Now' : 'Login to Get Started'}
             </Button>
             <Button
               variant="outline"
@@ -120,9 +111,11 @@ const Hero = ({ setCurrentView, user }) => {
                 Explore Premium Plans
             </Button>
         </motion.div>
+
       </div>
     </section>
   );
 };
 
 export default Hero;
+                                              
