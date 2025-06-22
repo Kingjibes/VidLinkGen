@@ -8,170 +8,65 @@ import GeneratorPage from '@/pages/GeneratorPage';
 import AnalyticsPage from '@/pages/AnalyticsPage';
 import AuthPage from '@/pages/AuthPage';
 import AdminDashboardPage from '@/pages/AdminDashboardPage';
+import VideoViewerPage from '@/pages/VideoViewerPage';
 import FloatingElements from '@/components/FloatingElements';
 import { supabase } from '@/lib/supabaseClient';
-import { useToast } from '@/components/ui/use-toast';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
-import { Label } from '@/components/ui/label';
 
-const PasswordPromptDialog = ({ open, onOpenChange, onSubmit, isLoading }) => {
-  const [password, setPassword] = useState('');
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    onSubmit(password);
-  };
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="glassmorphic-card modern-border sm:max-w-[425px]">
-        <DialogHeader>
-          <DialogTitle className="font-space-grotesk text-xl">Password Required</DialogTitle>
-          <DialogDescription>
-            This video link is protected. Please enter the password to continue.
-          </DialogDescription>
-        </DialogHeader>
-        <form onSubmit={handleSubmit}>
-          <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="password-prompt" className="text-right text-slate-300">
-                Password
-              </Label>
-              <Input
-                id="password-prompt"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="col-span-3 bg-[hsl(var(--input))] border-[hsl(var(--border))]"
-                required
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isLoading}>
-              Cancel
-            </Button>
-            <Button type="submit" className="bg-[hsl(var(--primary))] hover:bg-[hsl(var(--primary))]/90" disabled={isLoading}>
-              {isLoading ? 'Verifying...' : 'Unlock Video'}
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
-  );
-};
-
-
-const VideoRedirector = () => {
+const VideoLinkHandler = () => {
   const { shortCode } = useParams();
   const navigate = useNavigate();
-  const { toast } = useToast();
   const [linkData, setLinkData] = useState(null);
-  const [showPasswordPrompt, setShowPasswordPrompt] = useState(false);
-  const [isVerifyingPassword, setIsVerifyingPassword] = useState(false);
-  const [isLoadingPage, setIsLoadingPage] = useState(true);
-
-  const proceedToVideo = async (currentLinkData) => {
-    try {
-      const { error: updateError } = await supabase
-        .from('video_links')
-        .update({ 
-          clicks: (currentLinkData.clicks || 0) + 1,
-          views: (currentLinkData.views || 0) + 1 
-        })
-        .eq('id', currentLinkData.id);
-
-      if (updateError) {
-          console.error("Error updating link stats:", updateError);
-      }
-
-      let finalRedirectUrl = currentLinkData.original_source;
-      if (currentLinkData.storage_path && !currentLinkData.original_source.startsWith('http')) {
-          const { data: publicUrlData } = supabase.storage.from('videos').getPublicUrl(currentLinkData.storage_path);
-          if (publicUrlData && publicUrlData.publicUrl) {
-              finalRedirectUrl = publicUrlData.publicUrl;
-          } else {
-               console.error('Could not get public URL for stored video:', currentLinkData.storage_path);
-               toast({ title: "Error", description: "Could not retrieve video from storage.", variant: "destructive" });
-               navigate('/');
-               return;
-          }
-      }
-      
-      window.location.href = finalRedirectUrl;
-
-    } catch (error) {
-      console.error('Error proceeding to video:', error);
-      toast({ title: "Redirection Error", description: "An unexpected error occurred while trying to play the video.", variant: "destructive" });
-      navigate('/');
-    }
-  };
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
-    const fetchLink = async () => {
-      setIsLoadingPage(true);
+    const fetchAndLogLink = async () => {
       if (!shortCode) {
         navigate('/');
         return;
       }
 
       try {
-        const { data, error } = await supabase
+        const { data, error: fetchError } = await supabase
           .from('video_links')
-          .select('id, original_source, is_password_protected, password_hash, expiration_date, storage_path, clicks, views')
+          .select('*')
           .eq('short_code', shortCode)
           .single();
 
-        if (error || !data) {
-          console.error('Error fetching link or link not found:', error);
-          toast({ title: "Link Not Found", description: "The requested video link does not exist or has expired.", variant: "destructive" });
-          navigate('/');
-          return;
+        if (fetchError || !data) {
+          throw new Error("Link Not Found: The requested video link does not exist or has expired.");
         }
         
         if (data.expiration_date && new Date(data.expiration_date) < new Date()) {
-            toast({ title: "Link Expired", description: "This video link has expired.", variant: "destructive" });
-            navigate('/');
-            return;
+          throw new Error("Link Expired: This video link is no longer available.");
         }
         
         setLinkData(data);
-        setIsLoadingPage(false);
 
-        if (data.is_password_protected) {
-          setShowPasswordPrompt(true);
-        } else {
-          proceedToVideo(data);
-        }
+        const { error: clickError } = await supabase.rpc('log_link_event', {
+          link_id_param: data.id,
+          event_type_param: 'click',
+        });
+        if (clickError) console.error("Error logging click event:", clickError);
+        
+        const { error: viewError } = await supabase.rpc('log_link_event', {
+          link_id_param: data.id,
+          event_type_param: 'view',
+        });
+        if (viewError) console.error("Error logging view event:", viewError);
 
-      } catch (error) {
-        console.error('Unexpected error during link fetch:', error);
-        toast({ title: "Error", description: "An unexpected error occurred.", variant: "destructive" });
-        navigate('/');
-        setIsLoadingPage(false);
+      } catch (err) {
+        console.error('Error fetching link:', err);
+        setError(err.message);
+      } finally {
+        setIsLoading(false);
       }
     };
 
-    fetchLink();
-  }, [shortCode, navigate, toast]);
+    fetchAndLogLink();
+  }, [shortCode, navigate]);
 
-  const handlePasswordSubmit = async (enteredPassword) => {
-    if (!linkData) return;
-    setIsVerifyingPassword(true);
-    
-    if (enteredPassword === linkData.password_hash) {
-      setShowPasswordPrompt(false);
-      toast({ title: "Access Granted!", description: "Redirecting to video...", className: "bg-green-600 text-white" });
-      await proceedToVideo(linkData);
-    } else {
-      toast({ title: "Incorrect Password", description: "The password you entered is incorrect. Please try again.", variant: "destructive" });
-    }
-    setIsVerifyingPassword(false);
-  };
-
-  if (isLoadingPage || (linkData && linkData.is_password_protected && !showPasswordPrompt && !window.location.href.includes(linkData.original_source))) {
+  if (isLoading) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-background text-foreground p-4">
         <Helmet>
@@ -183,43 +78,18 @@ const VideoRedirector = () => {
             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
           </svg>
-          <h1 className="text-2xl font-space-grotesk font-semibold mb-2">
-            {linkData && linkData.is_password_protected ? 'Awaiting Password...' : 'Loading your video...'}
-          </h1>
+          <h1 className="text-2xl font-space-grotesk font-semibold mb-2">Loading your video...</h1>
           <p className="text-muted-foreground">Please wait a moment.</p>
         </div>
       </div>
     );
   }
 
-  return (
-    <>
-      <PasswordPromptDialog
-        open={showPasswordPrompt}
-        onOpenChange={(isOpen) => {
-          if (!isOpen && linkData && linkData.is_password_protected) { 
-            navigate('/'); 
-          }
-          setShowPasswordPrompt(isOpen);
-        }}
-        onSubmit={handlePasswordSubmit}
-        isLoading={isVerifyingPassword}
-      />
-      { !showPasswordPrompt && linkData && linkData.is_password_protected && (
-         <div className="min-h-screen flex flex-col items-center justify-center bg-background text-foreground p-4">
-            <Helmet>
-              <title>Access Denied - VidLinkGen</title>
-            </Helmet>
-            <div className="tech-grid" />
-            <div className="relative z-10 text-center">
-              <h1 className="text-2xl font-space-grotesk font-semibold mb-2">Access Denied</h1>
-              <p className="text-muted-foreground">Password required to view this video.</p>
-              <Button onClick={() => navigate('/')} className="mt-4">Go to Homepage</Button>
-            </div>
-        </div>
-      )}
-    </>
-  );
+  if (error) {
+     return <VideoViewerPage error={error} />;
+  }
+
+  return <VideoViewerPage linkData={linkData} />;
 };
 
 const ProtectedRoute = ({ children, allowedRoles, adminEmail }) => {
@@ -297,7 +167,7 @@ function App() {
               <Route path="/generator" element={<ProtectedRoute allowedRoles={['authenticated']}><GeneratorPage /></ProtectedRoute>} />
               <Route path="/analytics" element={<ProtectedRoute allowedRoles={['authenticated']}><AnalyticsPage /></ProtectedRoute>} />
               <Route path="/admin-dashboard" element={<ProtectedRoute allowedRoles={['admin']} adminEmail={ADMIN_EMAIL}><AdminDashboardPage /></ProtectedRoute>} />
-              <Route path="/v/:shortCode" element={<VideoRedirector />} />
+              <Route path="/v/:shortCode" element={<VideoLinkHandler />} />
             </Routes>
           </div>
           
