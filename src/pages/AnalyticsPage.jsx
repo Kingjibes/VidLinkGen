@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { Helmet } from 'react-helmet';
@@ -16,6 +15,15 @@ const AnalyticsPage = () => {
   const { toast } = useToast();
   const [analyticsData, setAnalyticsData] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [currentUser, setCurrentUser] = useState(null);
+
+  useEffect(() => {
+    const getSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      setCurrentUser(session?.user || null);
+    };
+    getSession();
+  }, []);
 
   const isLinkExpired = (expirationDate) => {
     if (!expirationDate) return false;
@@ -23,27 +31,56 @@ const AnalyticsPage = () => {
   };
 
   const loadAnalytics = useCallback(async () => {
+    if (!currentUser) {
+        setIsLoading(false);
+        return;
+    }
     setIsLoading(true);
+
     try {
       const { data: savedLinks, error } = await supabase
         .from('video_links')
         .select('*')
+        .eq('user_id', currentUser.id)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
+      if (!savedLinks || savedLinks.length === 0) {
+        setAnalyticsData(null);
+        setIsLoading(false);
+        return;
+      }
       
+      const linkIds = savedLinks.map(link => link.id);
       const totalClicks = savedLinks.reduce((sum, link) => sum + (link.clicks || 0), 0);
       const totalViews = savedLinks.reduce((sum, link) => sum + (link.views || 0), 0);
       const activeLinksCount = savedLinks.filter(link => !isLinkExpired(link.expiration_date)).length;
 
-      const clicksToday = Math.floor(totalClicks * (Math.random() * 0.1 + 0.05)); 
-      const viewsToday = Math.floor(totalViews * (Math.random() * 0.1 + 0.05));
+      const todayStart = new Date();
+      todayStart.setUTCHours(0, 0, 0, 0);
+
+      const { count: clicksTodayCount, error: clicksTodayError } = await supabase
+        .from('link_events')
+        .select('*', { count: 'exact', head: true })
+        .in('link_id', linkIds)
+        .eq('event_type', 'click')
+        .gte('created_at', todayStart.toISOString());
+      
+      if (clicksTodayError) console.error("Error fetching today's clicks:", clicksTodayError);
+
+      const { count: viewsTodayCount, error: viewsTodayError } = await supabase
+        .from('link_events')
+        .select('*', { count: 'exact', head: true })
+        .in('link_id', linkIds)
+        .eq('event_type', 'view')
+        .gte('created_at', todayStart.toISOString());
+
+      if (viewsTodayError) console.error("Error fetching today's views:", viewsTodayError);
 
       const topPerforming = savedLinks
         .sort((a, b) => ((b.clicks || 0) + (b.views || 0)) - ((a.clicks || 0) + (a.views || 0)))
         .slice(0, 5)
         .map(link => ({ ...link, name: link.custom_name || link.short_code || `Link ID: ${link.id.substring(0,8)}`}));
-
 
       const geoData = [
         { id: 'US', name: 'United States', value: Math.max(0, Math.floor(totalClicks * 0.4)) },
@@ -56,7 +93,6 @@ const AnalyticsPage = () => {
       if (totalClicks > 0 && geoData.length === 0) {
           geoData.push({id: 'UN', name: 'Unknown', value: totalClicks});
       }
-
 
       const timeDataRaw = [
         { hour: '00-04', clicks: Math.max(0, Math.floor(Math.random() * (totalClicks * 0.05 + 5))) },
@@ -78,7 +114,8 @@ const AnalyticsPage = () => {
           totalClicks, totalViews, 
           activeLinks: activeLinksCount, 
           totalLinks: savedLinks.length,
-          clicksToday, viewsToday,
+          clicksToday: clicksTodayCount || 0,
+          viewsToday: viewsTodayCount || 0,
           avgCTR: totalViews > 0 ? ((totalClicks / totalViews) * 100).toFixed(1) : 0,
         },
         topPerforming,
@@ -89,11 +126,11 @@ const AnalyticsPage = () => {
     } catch (error) {
       console.error("Error loading analytics:", error);
       toast({ title: "Error", description: "Could not load analytics data.", variant: "destructive" });
-      setAnalyticsData(null); // Ensure it's null on error
+      setAnalyticsData(null);
     } finally {
       setIsLoading(false);
     }
-  }, [toast]);
+  }, [currentUser, toast]);
 
   useEffect(() => {
     loadAnalytics();
@@ -170,6 +207,6 @@ const AnalyticsPage = () => {
       </div>
     </>
   );
-};
+}
 
 export default AnalyticsPage;

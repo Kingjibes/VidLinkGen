@@ -1,229 +1,16 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Helmet } from 'react-helmet';
-import { motion } from 'framer-motion';
-import { PlusCircle, Search, Edit3, Trash2, ExternalLink, Eye, TrendingUp, ShieldCheck, CalendarOff, Copy as CopyIcon, AlertTriangle } from 'lucide-react';
-import Navigation from '@/components/Navigation';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
-import { Alert, AlertDescription, AlertTitle, AlertIcon, AlertCloseButton } from '@/components/ui/alert';
 import { useToast } from '@/components/ui/use-toast';
 import { supabase } from '@/lib/supabaseClient';
 import { useNavigate } from 'react-router-dom';
-import LinkCustomizationForm from '@/components/generator/LinkCustomizationForm';
-
-const DashboardHeader = ({ linkCount, onSearchChange, searchTerm, onNewLink }) => (
-  <motion.div 
-    initial={{ opacity: 0, y: -20 }}
-    animate={{ opacity: 1, y: 0 }}
-    transition={{ duration: 0.5 }}
-    className="flex flex-col sm:flex-row justify-between items-center mb-8"
-  >
-    <div>
-      <h1 className="text-3xl md:text-4xl font-space-grotesk font-bold mb-1 text-gradient-blue-red">
-        My Video Links
-      </h1>
-      <p className="text-slate-400 text-sm">
-        A list of all links you've generated. {linkCount} link(s) found.
-      </p>
-    </div>
-    <div className="flex items-center gap-3 mt-4 sm:mt-0 w-full sm:w-auto">
-      <div className="relative flex-grow sm:flex-grow-0">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-        <Input 
-          type="search" 
-          placeholder="Search links..." 
-          className="pl-10 w-full sm:w-64 bg-[hsl(var(--input))] border-[hsl(var(--border))]" 
-          value={searchTerm}
-          onChange={onSearchChange}
-        />
-      </div>
-      <Button onClick={onNewLink} className="bg-gradient-to-r from-[hsl(var(--primary))] to-[hsl(var(--accent))] hover:opacity-90 text-white shrink-0">
-        <PlusCircle className="w-4 h-4 mr-2" /> New Link
-      </Button>
-    </div>
-  </motion.div>
-);
-
-const DevelopmentBanner = ({ show, onClose }) => {
-  if (!show) return null;
-  return (
-    <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="mb-6">
-      <Alert variant="warning" className="glassmorphic-card-soft modern-border">
-        <AlertIcon icon={AlertTriangle} className="text-yellow-500" />
-        <AlertTitle className="font-space-grotesk text-yellow-400">Feature In Development</AlertTitle>
-        <AlertDescription className="text-yellow-300/80">
-          Link click/view simulated & stats updated. Actual redirect/playback not implemented yet for all scenarios.
-        </AlertDescription>
-        <AlertCloseButton onClick={onClose} className="text-yellow-400 hover:text-yellow-200" />
-      </Alert>
-    </motion.div>
-  );
-};
-
-const LinkCard = ({ link, onEdit, onDelete, onCopy, onOpen }) => (
-  <motion.div
-    initial={{ opacity: 0, scale: 0.95 }}
-    animate={{ opacity: 1, scale: 1 }}
-    transition={{ duration: 0.3 }}
-  >
-    <Card className="glassmorphic-card modern-border h-full flex flex-col">
-      <CardHeader>
-        <div className="flex justify-between items-start">
-          <CardTitle className="font-space-grotesk text-xl break-all">
-            {link.custom_name || link.short_code}
-          </CardTitle>
-          <div className="flex gap-1.5">
-            {link.is_password_protected && <ShieldCheck className="w-4 h-4 text-green-400" title="Password Protected"/>}
-            {link.expiration_date && new Date(link.expiration_date) < new Date() && <CalendarOff className="w-4 h-4 text-red-400" title="Expired"/>}
-          </div>
-        </div>
-        <CardDescription className="text-xs text-slate-400 break-all truncate" title={link.description}>
-            {link.description || 'No description'}
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="flex-grow">
-        <p className="text-xs text-primary font-mono break-all mb-1 cursor-pointer hover:underline" onClick={() => onCopy(link.url)} title="Click to copy">
-            {link.url}
-        </p>
-        <p className="text-xs text-slate-500 mb-3">
-          Created: {new Date(link.created_at).toLocaleDateString()}
-        </p>
-        <div className="flex flex-wrap gap-x-3 gap-y-1 items-center">
-          <StatCard icon={Eye} label="Views" value={link.views || 0} color="text-sky-400" />
-          <StatCard icon={TrendingUp} label="Clicks" value={link.clicks || 0} color="text-emerald-400" />
-        </div>
-      </CardContent>
-      <CardFooter className="flex justify-end gap-2 border-t border-[hsl(var(--border))] pt-4 mt-auto">
-        <Button variant="outline" size="icon" onClick={() => onOpen(link.url)} title="Open Link" className="border-sky-500/50 hover:bg-sky-500/10 text-sky-400">
-          <ExternalLink className="w-4 h-4" />
-        </Button>
-        <Button variant="outline" size="icon" onClick={() => onCopy(link.url)} title="Copy Link" className="border-slate-500/50 hover:bg-slate-500/10 text-slate-400">
-          <CopyIcon className="w-4 h-4" />
-        </Button>
-        <Button variant="outline" size="icon" onClick={() => onEdit(link)} title="Edit Link" className="border-yellow-500/50 hover:bg-yellow-500/10 text-yellow-400">
-          <Edit3 className="w-4 h-4" />
-        </Button>
-        <Button variant="outline" size="icon" onClick={() => onDelete(link)} title="Delete Link" className="border-red-500/50 hover:bg-red-500/10 text-red-400">
-          <Trash2 className="w-4 h-4" />
-        </Button>
-      </CardFooter>
-    </Card>
-  </motion.div>
-);
-
-const StatCard = ({ icon: Icon, label, value, color }) => (
-  <div className={`flex items-center p-2 rounded text-xs ${color || 'text-slate-400'}`}>
-    <Icon className="w-3.5 h-3.5 mr-1.5" />
-    {value} {label}
-  </div>
-);
-
-const EditLinkDialog = ({ isOpen, onOpenChange, currentLink, formData, onInputChange, onSubmit, isLoading }) => (
-  <Dialog open={isOpen} onOpenChange={onOpenChange}>
-    <DialogContent className="glassmorphic-card modern-border sm:max-w-md">
-      <DialogHeader>
-        <DialogTitle className="font-space-grotesk">Edit Link Settings</DialogTitle>
-        <DialogDescription>
-          Update the customization options for your video link.
-        </DialogDescription>
-      </DialogHeader>
-      {currentLink && (
-        <form onSubmit={onSubmit} className="space-y-4 py-2">
-          <LinkCustomizationForm
-            formData={formData}
-            onInputChange={onInputChange}
-            isLoading={isLoading}
-          />
-          <DialogFooter>
-            <DialogClose asChild>
-              <Button type="button" variant="outline" disabled={isLoading}>Cancel</Button>
-            </DialogClose>
-            <Button type="submit" className="bg-gradient-to-r from-[hsl(var(--primary))] to-[hsl(var(--accent))] hover:opacity-90" disabled={isLoading}>
-              {isLoading ? 'Saving...' : 'Save Changes'}
-            </Button>
-          </DialogFooter>
-        </form>
-      )}
-    </DialogContent>
-  </Dialog>
-);
-
-const DeleteLinkDialog = ({ isOpen, onOpenChange, currentLink, onSubmit, isLoading }) => (
-  <Dialog open={isOpen} onOpenChange={onOpenChange}>
-    <DialogContent className="glassmorphic-card modern-border sm:max-w-md">
-      <DialogHeader>
-        <DialogTitle className="font-space-grotesk text-red-500">Confirm Deletion</DialogTitle>
-        <DialogDescription>
-          Are you sure you want to delete this link? This action cannot be undone. 
-          {currentLink?.storage_path && " The associated video file in storage will also be removed."}
-        </DialogDescription>
-      </DialogHeader>
-      <DialogFooter>
-        <DialogClose asChild>
-          <Button type="button" variant="outline" disabled={isLoading}>Cancel</Button>
-        </DialogClose>
-        <Button variant="destructive" onClick={onSubmit} disabled={isLoading}>
-          {isLoading ? 'Deleting...' : 'Yes, Delete Link'}
-        </Button>
-      </DialogFooter>
-    </DialogContent>
-  </Dialog>
-);
-
-const LoadingSkeletons = () => (
-  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-    {[...Array(3)].map((_, i) => (
-      <Card key={i} className="glassmorphic-card modern-border animate-pulse">
-        <CardHeader>
-          <div className="h-6 bg-slate-700 rounded w-3/4 mb-2"></div>
-          <div className="h-4 bg-slate-700 rounded w-1/2"></div>
-        </CardHeader>
-        <CardContent>
-          <div className="h-4 bg-slate-700 rounded w-full mb-2"></div>
-          <div className="h-4 bg-slate-700 rounded w-5/6"></div>
-        </CardContent>
-        <CardFooter className="flex justify-end gap-2">
-          <div className="h-8 w-8 bg-slate-700 rounded"></div>
-          <div className="h-8 w-8 bg-slate-700 rounded"></div>
-          <div className="h-8 w-8 bg-slate-700 rounded"></div>
-        </CardFooter>
-      </Card>
-    ))}
-  </div>
-);
-
-const EmptyState = ({ isSearch, onNewLink }) => (
-  <Card className="glassmorphic-card modern-border text-center py-12">
-    <CardHeader>
-      <CardTitle className="font-space-grotesk text-2xl">No Links Found</CardTitle>
-      <CardDescription>
-        {isSearch ? "No links match your search." : "You haven't created any links yet."}
-      </CardDescription>
-    </CardHeader>
-    <CardContent>
-      <Button onClick={onNewLink} className="bg-gradient-to-r from-[hsl(var(--primary))] to-[hsl(var(--accent))] hover:opacity-90 text-white">
-        <PlusCircle className="w-4 h-4 mr-2" /> Create Your First Link
-      </Button>
-    </CardContent>
-  </Card>
-);
-
-const AccessDeniedState = ({ onLogin }) => (
-  <Card className="glassmorphic-card modern-border text-center py-12">
-    <CardHeader>
-        <CardTitle className="font-space-grotesk text-2xl">Access Denied</CardTitle>
-        <CardDescription>Please log in to view your dashboard and manage your links.</CardDescription>
-    </CardHeader>
-    <CardContent>
-        <Button onClick={onLogin}>
-            Login / Sign Up
-        </Button>
-    </CardContent>
-  </Card>
-);
-
+import Navigation from '@/components/Navigation';
+import DashboardHeader from '@/components/dashboard/DashboardHeader';
+import LinkCard from '@/components/dashboard/LinkCard';
+import EditLinkDialog from '@/components/dashboard/EditLinkDialog';
+import DeleteLinkDialog from '@/components/dashboard/DeleteLinkDialog';
+import QRCodeDialog from '@/components/dashboard/QRCodeDialog';
+import FeaturedLinkCard from '@/components/dashboard/FeaturedLinkCard';
+import { LoadingSkeletons, EmptyState, AccessDeniedState } from '@/components/dashboard/DashboardStates';
 
 const DashboardPage = () => {
   const [links, setLinks] = useState([]);
@@ -231,6 +18,7 @@ const DashboardPage = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isQrCodeDialogOpen, setIsQrCodeDialogOpen] = useState(false);
   const [currentLink, setCurrentLink] = useState(null);
   const [editFormData, setEditFormData] = useState({
     customName: '',
@@ -239,7 +27,6 @@ const DashboardPage = () => {
     password: '',
   });
   const [currentUser, setCurrentUser] = useState(null);
-  const [showDevBanner, setShowDevBanner] = useState(true);
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -305,12 +92,17 @@ const DashboardPage = () => {
     setSearchTerm(event.target.value);
   };
 
-  const filteredLinks = links.filter(link => 
+  const filteredLinks = useMemo(() => links.filter(link => 
     (link.custom_name && link.custom_name.toLowerCase().includes(searchTerm.toLowerCase())) ||
     (link.description && link.description.toLowerCase().includes(searchTerm.toLowerCase())) ||
     link.original_source.toLowerCase().includes(searchTerm.toLowerCase()) ||
     link.url.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  ), [links, searchTerm]);
+
+  const featuredLink = useMemo(() => {
+    if (links.length === 0) return null;
+    return [...links].sort((a, b) => (b.clicks || 0) - (a.clicks || 0))[0];
+  }, [links]);
 
   const openEditDialog = (link) => {
     setCurrentLink(link);
@@ -376,6 +168,11 @@ const DashboardPage = () => {
     setIsDeleteDialogOpen(true);
   };
 
+  const openQrCodeDialog = (link) => {
+    setCurrentLink(link);
+    setIsQrCodeDialogOpen(true);
+  };
+
   const handleDeleteLink = async () => {
     if (!currentLink) return;
     setIsLoading(true);
@@ -400,7 +197,8 @@ const DashboardPage = () => {
       toast({ title: "Deleted!", description: "Link removed successfully." });
       fetchLinks();
       setIsDeleteDialogOpen(false);
-    } catch (error) {
+    } catch (error)
+    {
       console.error("Error deleting link:", error);
       toast({ title: "Delete Error", description: error.message || "Could not delete link.", variant: "destructive" });
     } finally {
@@ -433,27 +231,30 @@ const DashboardPage = () => {
               searchTerm={searchTerm} 
               onNewLink={() => navigate('/generator')} 
             />
-            <DevelopmentBanner show={showDevBanner} onClose={() => setShowDevBanner(false)} />
-
+            
             {isLoading ? (
               <LoadingSkeletons />
             ) : !currentUser ? (
               <AccessDeniedState onLogin={() => navigate('/auth')} />
-            ) : filteredLinks.length === 0 ? (
+            ) : links.length === 0 ? (
               <EmptyState isSearch={!!searchTerm} onNewLink={() => navigate('/generator')} />
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {filteredLinks.map((link) => (
-                  <LinkCard 
-                    key={link.id} 
-                    link={link} 
-                    onEdit={openEditDialog} 
-                    onDelete={openDeleteDialog} 
-                    onCopy={handleCopyToClipboard}
-                    onOpen={(url) => window.open(url, '_blank')}
-                  />
-                ))}
-              </div>
+              <>
+                <FeaturedLinkCard link={featuredLink} onOpen={(url) => window.open(url, '_blank')} />
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-6">
+                  {filteredLinks.map((link) => (
+                    <LinkCard 
+                      key={link.id} 
+                      link={link} 
+                      onEdit={openEditDialog} 
+                      onDelete={openDeleteDialog} 
+                      onCopy={handleCopyToClipboard}
+                      onOpen={(url) => window.open(url, '_blank')}
+                      onQrCode={openQrCodeDialog}
+                    />
+                  ))}
+                </div>
+              </>
             )}
           </div>
         </main>
@@ -474,6 +275,11 @@ const DashboardPage = () => {
         currentLink={currentLink} 
         onSubmit={handleDeleteLink} 
         isLoading={isLoading} 
+      />
+      <QRCodeDialog
+        isOpen={isQrCodeDialogOpen}
+        onOpenChange={setIsQrCodeDialogOpen}
+        link={currentLink}
       />
     </>
   );
