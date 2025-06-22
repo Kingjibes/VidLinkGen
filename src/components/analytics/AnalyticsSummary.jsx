@@ -1,56 +1,84 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Card, CardContent } from '@/components/ui/card';
-import { Eye, TrendingUp, Link2, BarChartHorizontalBig, Users, CheckCircle } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { TrendingUp, Eye, Link2, CheckCircle, Percent } from 'lucide-react';
 
-const StatCard = ({ icon: Icon, label, value, todayValue, color, delay }) => (
-  <motion.div
-    initial={{ opacity: 0, y: 15 }}
-    animate={{ opacity: 1, y: 0 }}
-    transition={{ duration: 0.6, delay, ease: "easeOut" }}
-  >
-    <Card className="glassmorphic-card modern-border h-full">
-      <CardContent className="p-5">
-        <div className="flex items-center justify-between mb-1">
-          <p className="text-sm text-slate-400">{label}</p>
-          <Icon className={`w-6 h-6 ${color}`} />
-        </div>
-        <p className={`text-3xl font-bold ${color}`}>{value}</p>
-        {todayValue !== undefined && (
-          <p className="text-xs text-green-400 mt-0.5">
-            +{todayValue} today
-          </p>
-        )}
-      </CardContent>
-    </Card>
-  </motion.div>
+const StatCard = ({ title, value, todayValue, icon: Icon, color, description }) => (
+  <Card className="glassmorphic-card modern-border">
+    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+      <CardTitle className="text-sm font-medium text-slate-300">{title}</CardTitle>
+      <Icon className={`h-4 w-4 ${color}`} />
+    </CardHeader>
+    <CardContent>
+      <div className="text-2xl font-bold">{value}</div>
+      {description ? (
+        <p className="text-xs text-slate-400">{description}</p>
+      ) : (
+        <p className="text-xs text-slate-400">
+          <span className="text-green-400">+{todayValue}</span> today
+        </p>
+      )}
+    </CardContent>
+  </Card>
 );
 
-
 const AnalyticsSummary = ({ summary }) => {
-  const { totalClicks, totalViews, activeLinks, totalLinks, clicksToday, viewsToday, avgCTR } = summary;
-
-  const stats = [
-    { icon: TrendingUp, label: "Total Clicks", value: totalClicks, todayValue: clicksToday, color: "text-[hsl(var(--primary))]" },
-    { icon: Eye, label: "Total Views", value: totalViews, todayValue: viewsToday, color: "text-green-500" },
-    { icon: Link2, label: "Active Links", value: activeLinks, todayValue: `of ${totalLinks}`, color: "text-orange-500" },
-    { icon: BarChartHorizontalBig, label: "Avg. CTR", value: `${avgCTR}%`, color: "text-[hsl(var(--secondary))]" },
+  const summaryCards = [
+    {
+      title: 'Total Clicks',
+      value: summary.totalClicks,
+      todayValue: summary.clicksToday,
+      icon: TrendingUp,
+      color: 'text-green-500',
+    },
+    {
+      title: 'Total Views',
+      value: summary.totalViews,
+      todayValue: summary.viewsToday,
+      icon: Eye,
+      color: 'text-sky-400',
+    },
+    {
+      title: 'Active Links',
+      value: summary.activeLinks,
+      description: `${summary.activeLinks} of ${summary.totalLinks} total links are active`,
+      icon: CheckCircle,
+      color: 'text-yellow-400',
+    },
+    {
+      title: 'Total Links',
+      value: summary.totalLinks,
+      description: 'All links generated on the platform',
+      icon: Link2,
+      color: 'text-purple-400',
+    },
+    {
+      title: 'Avg. Click-Thru Rate',
+      value: `${summary.avgCTR}%`,
+      description: 'Based on views vs. clicks',
+      icon: Percent,
+      color: 'text-orange-400',
+    },
   ];
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-      {stats.map((stat, idx) => (
-        <StatCard 
-          key={stat.label}
-          icon={stat.icon}
-          label={stat.label}
-          value={stat.value}
-          todayValue={stat.todayValue}
-          color={stat.color}
-          delay={idx * 0.1}
-        />
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ staggerChildren: 0.1, delayChildren: 0.2 }}
+      className="grid gap-4 md:grid-cols-2 lg:grid-cols-5"
+    >
+      {summaryCards.map((card, index) => (
+        <motion.div
+          key={index}
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, ease: 'easeOut' }}
+        >
+          <StatCard {...card} />
+        </motion.div>
       ))}
-    </div>
+    </motion.div>
   );
 };
 
